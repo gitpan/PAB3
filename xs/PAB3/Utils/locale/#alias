@@ -1,0 +1,11 @@
+# locale alias table
+# alias			locale
+
+de				de_DE
+de.UTF-8		de_DE.UTF-8
+de_AT			de_DE
+de_AT.UTF-8		de_DE.UTF-8
+
+en				en_US
+en.UTF-8		en_US
+en_US.UTF-8		en_US

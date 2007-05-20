@@ -1,0 +1,45 @@
+PAB3 version 3.0.0
+==================
+
+PAB3 contains a framework to build rapid applications. It uses
+templates to produce output. The templates are translated into
+perl scripts before running them. This should perform the maximum of speed.
+PAB3 also can handle database connections and provides an easy to use
+interface to it. It can log all of the key actions, including the
+elapsed time in a file. Several formating functions may help
+genrating nice output.
+It supports the CGI interface and has been optimized for running under
+ModPerl or PerlEx environments.
+
+It has been tested on unix, darwin and win32 platforms.
+
+INSTALLATION
+
+To install this module type the following:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+
+Use "perl Makefile.PL --help" to get a list of avaiable options.
+
+DEPENDENCIES
+
+This module may require these other modules and libraries:
+
+Digest::MD5
+Encode
+Storable
+Time::HiRes
+
+mod_perl 2.x
+mod_perl 1.x
+
+COPYRIGHT AND LICENCE
+
+Copyright (C) 2007 by Christian Mueller
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.8 or,
+at your option, any later version of Perl 5 you may have available.
