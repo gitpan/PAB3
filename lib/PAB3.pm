@@ -12,7 +12,7 @@ no warnings 'uninitialized';
 use vars qw($VERSION $_CURRENT);
 
 BEGIN {
-	$VERSION = '3.0.0';
+	$VERSION = '3.0.1';
 }
 
 use Carp ();
@@ -1535,8 +1535,8 @@ Example:
 
 The little extended language is needed to extract the PAB and Perl elements from
 the rest of the template.
-By default program sequences are includes in <* ... *>
-and directives are separated by ;; .
+By default program sequences are included in <* ... *> and directives are
+separated by ;; .
 This parameters can be overwritten in L<new()>.
 
 B<Some Examples>
@@ -1579,7 +1579,7 @@ separators. B<All directives are case insensitive>.
 =item =   E<lt>expressionE<gt>
 
 Prints the output returned from E<lt>expressionE<gt>.
-B<Performance notice:> Tests showed the double of speed
+B<Performance notice:> Tests are showing the double of speed
 when expressions are combined as strings instead of multiple argmuents.
 For example:
 
@@ -1589,7 +1589,7 @@ For example:
    slower:
    <* PRINT $x, ' some data: ', $str *>
 
-Joining several PRINT directives into on directive does not realy
+Joining several PRINT directives into one directive does not realy
 affect to the speed, because the optimizer will do it automatically.
 
   <* PRINT <expression> *>
@@ -1663,7 +1663,7 @@ Process another template file. Please note the "class_name" in L<new()>.
 
 Performs a predefined loop or a loop which has been registered by
 L<register_loop>. In predifened loops like ARRAY, FOR and HASH, E<lt>exp1E<gt>
-is use as source and E<lt>exp2E<gt> is used as record.
+is used as source and E<lt>exp2E<gt> is used as record.
 In userdefined loops E<lt>exp1E<gt> is used as record and E<lt>exp2E<gt> is used
 as argument.
 
@@ -1707,7 +1707,7 @@ This example also shows the use of the L<PAB3::DB|PAB3::DB> class.
   $r_gb = $db->query( 'SELECT * FROM guestbook ORDER BY Time DESC' );
   
   $pab->register_loop(
-       'GUESTBOOK', 'fetch_hash', PAB_FUNC, 'row', PAB_HASH, '$r_gb'
+       'GUESTBOOK', 'fetch_hash' => PAB_FUNC, 'row' => PAB_HASH, '$r_gb'
   );
   
   $pab->make_script_and_run( 'template.htm' );

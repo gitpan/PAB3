@@ -29,7 +29,6 @@ DEPENDENCIES
 This module may require these other modules and libraries:
 
 Digest::MD5
-Encode
 Storable
 Time::HiRes
 

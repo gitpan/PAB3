@@ -47,8 +47,8 @@ CODE:
 	}
 	Copy( "locale/", s1, 7, char );
 	Copy( "zoneinfo/", s2, 9, char );
-	*( s1 += 7 ) = 0;
-	*( s2 += 9 ) = 0;
+	*( s1 += 7 ) = '\0';
+	*( s2 += 9 ) = '\0';
 	MY_CXT.locale_path_length = (int) ( s1 - MY_CXT.locale_path );
 	MY_CXT.zoneinfo_path_length = (int) ( s2 - MY_CXT.zoneinfo_path );
 	read_locale_alias();
@@ -336,10 +336,10 @@ char fillchar
 PREINIT:
 	char thousep;
 	char pos2;
+	my_thread_var_t *tv;
+	char str[256];
 CODE:
 	{
-		my_thread_var_t *tv;
-		char str[256];
 		if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
 		if( pnt == 0 ) pnt = tv->locale.decimal_point;
 		if( thou == 0 || ! SvOK( thou ) )
@@ -370,7 +370,7 @@ int
 _set_timezone( tid, tz )
 UV tid
 const char *tz
-INIT:
+PREINIT:
 	my_thread_var_t *tv;
 CODE:
 	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
@@ -395,7 +395,7 @@ OUTPUT:
 void
 _localtime( tid, ... )
 UV tid;
-INIT:
+PREINIT:
 	time_t timer;
 	my_vdatetime_t *tim;
 	my_thread_var_t *tv;

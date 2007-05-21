@@ -117,11 +117,12 @@ __END__
 
 =head1 NAME
 
-PAB::DB::Driver::Sqlite3 - Perl wrapper to libsqlite3 and driver for PAB::DB class
+PAB3::DB::Driver::Sqlite3 - Perl wrapper to libsqlite3 and driver for the
+PAB3::DB class
 
 =head1 SYNOPSIS
 
-  use PAB::DB::Driver::Sqlite3;
+  use PAB3::DB::Driver::Sqlite3;
   # functions and constants are exported by default
   
   $linkid = sqlite3_open( $db );

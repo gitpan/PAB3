@@ -258,8 +258,8 @@ parse_std:
 				close $hf if $hf;
 				if( $bi < 0 && substr( $input, 0, 2 ) ne '--' ) {
 					&Carp::croak(
-						qq(Reached end of input while seeking boundary of multipart.
-						Format of CGI input is wrong.)
+						'Reached end of input while seeking boundary of multipart.'
+						. ' Format of CGI input is wrong.'
 					);
 				}
 				last;

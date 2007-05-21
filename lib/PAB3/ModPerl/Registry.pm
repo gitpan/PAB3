@@ -48,7 +48,7 @@ sub handler : method {
 	# parse request and cookies
 	&PAB3::CGI::init();
 	
-	$ENV{'GATEWAY_INTERFACE'} = 'CGI-ModPerl-PAB';
+	$ENV{'GATEWAY_INTERFACE'} = 'CGI-ModPerl-PAB3';
 	
 	my $filename = $r->filename();
 

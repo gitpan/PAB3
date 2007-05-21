@@ -12,7 +12,7 @@ use warnings;
 use Storable ();
 use Carp ();
 
-use vars qw($VERSION $MODPERL);
+use vars qw($VERSION $MODPERL $TEMPDIR);
 
 our $HMC_DATA			= 0;
 our $HMC_PATH_CACHE		= 1;
@@ -37,6 +37,15 @@ BEGIN {
 	elsif( $MODPERL == 1 ) {
 		require Apache;
 	}
+	if( $^O eq 'MSWin32' ) {
+		$TEMPDIR = $ENV{'TEMP'} . "\\"
+			# CSIDL_WINDOWS (0x0024)
+			|| Win32::GetLongPathName( Win32::GetFolderPath( 0x0024 ) ) . "\\Temp\\"
+		;
+	}
+	else {
+		$TEMDIR = '/tmp/';
+	}
 }
 
 1;
@@ -55,15 +64,7 @@ sub new {
 	$this->[$HMC_CACHE_FILE_MT] = 0;
 	$this->[$HMC_DATA_CHANGED] = 0;
 	$this->[$HMC_DATA] = {};
-	if( $^O eq 'MSWin32' ) {
-		$this->[$HMC_PATH_CACHE] = $ENV{'TEMP'} . "\\"
-			# CSIDL_WINDOWS (0x0024)
-			|| Win32::GetLongPathName( Win32::GetFolderPath( 0x0024 ) ) . "\\Temp\\"
-		;
-	}
-	else {
-		$this->[$HMC_PATH_CACHE] = '/tmp/';
-	}
+	$this->[$HMC_PATH_CACHE] = $TEMPDIR;
 	$this->[$HMC_CACHE_FILE] = unpack( '%32C*', $0 ) . '.hashmap.cache';
 	$this->init( @_ );
 	return $this;

@@ -59,6 +59,7 @@ WriteMakefile(
     PREREQ_PM => {
         'Time::HiRes' => 0,
         'Digest::MD5' => 0,
+        'Storable' => 0,
     },
     XSPROTOARG => '-prototypes',
     DIR => [ 'xs' ],
