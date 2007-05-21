@@ -874,7 +874,8 @@ UTF-8 escape sequences:
 
 Note that encode_uri() by itself cannot form proper HTTP GET and POST requests,
 because "&", "+", and "=" are not encoded, which are treated as special
-characters in GET and POST requests. L<encode_uri_component()>, however, does
+characters in GET and POST requests.
+L<encode_uri_component()|PAB3::CGI/encode_uri_component>, however, does
 encode these characters.
 
 
@@ -884,7 +885,7 @@ Replaces each escape sequence in the encoded URI with the character that
 it represents. 
 
 Does not decode escape sequences that could not have been introduced by
-L<encode_uri()>. 
+L<encode_uri()|PAB3::CGI/encode_uri>. 
 
 
 =item print_var ( ... )
@@ -901,7 +902,7 @@ Example:
 =item cleanup ()
 
 Cleanup the PAB3::CGI environment, delete uploaded files and call the callback
-functions registered by L<cleanup_register()>.
+functions registered by L<cleanup_register()|PAB3::CGI/cleanup_register>.
 
 cleanup() is called internally at the END block or inside ModPerl as cleanup
 callback at the end of each request. In other environments, like PerlEx or FastCGI,

@@ -253,7 +253,7 @@ I<%arg>
 A combination of the following parameters:
 
   level        => a logging level
-  file         => a target file or handle to log into
+  file         => a target file or handle to write log message to
   format       => a logging format
   header       => a header message (info) to be send on every session
   utils        => a reference to a PAB3::Utils class
@@ -263,6 +263,7 @@ B<I<level>>
 The logging level. Only messages with log level of the level defined or
 lower will be logged. Default level is 2.
 
+  0 - log nothing
   1 - log error messages
   2 - log warning messages
   3 - log informative messages
@@ -283,7 +284,7 @@ B<I<format>>
 
 A log format string. Following parameters are defined
 
-  %t   Current time in format mmm dd HH:MM::SS
+  %t   Current time in format mmm dd HH:MM:SS
   %p   Process ID ($$)
   %r   Runtime ID, a randomly generated id
   %e   Elapsed time in seconds (i.e. 0.0025 = 2.5 ms)
@@ -291,7 +292,8 @@ A log format string. Following parameters are defined
 
 B<I<header>>
 
-A string to be send on every session starting by L<new()> or L<reset()>.
+A string to be send on every session starting by L<new()|PAB3::Logger/new>
+or L<reset()|PAB3::Logger/reset>.
 The header will send as level "info".
 
 B<I<utils>>
@@ -308,12 +310,13 @@ B<Example>
   $logger = PAB3::Logger->new(
       'file'   => '/path/to/log/file',
       'level'  => 4, # log all
-      'format' => '[%t] [%p/%r] [%c] [%e]',
+      'format' => '[%t] [%p] [%r] [%c] [%e]',
       'header' => '--- starting session ---',
   );
   
   ...
   
+  # end of script
   $logger->info( 'session finished' );
 
 

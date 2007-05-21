@@ -12,7 +12,7 @@ no warnings 'uninitialized';
 use vars qw($VERSION $_CURRENT);
 
 BEGIN {
-	$VERSION = '3.0.1';
+	$VERSION = '3.0.2';
 }
 
 use Carp ();

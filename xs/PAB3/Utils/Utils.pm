@@ -178,7 +178,7 @@ This module should be B<threadsafe, BUT:>
 Under ModPerl or PerlEx environments several scripts may take access to the same
 instance of the Perl interpreter. All module functions are interpreter global!
 If you plan using several locale and time settings in your scripts which may
-take access to the same interpreter you should use L<new()> to
+take access to the same interpreter you should use L<new()|PAB3::Utils/new> to
 create independend objects. 
 
 

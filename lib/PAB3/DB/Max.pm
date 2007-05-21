@@ -174,7 +174,8 @@ sub selectrow_hashref {
 
 sub selectall_arrayref {
 	my( $this, $sql ) = ( shift, shift );
-	my( $res, $rows, $stmt );
+	my( $res, $rows, $stmt, $st1 );
+	$st1 = shift if ref( $_[0] );
 	if( @_ ) {
 		$stmt = $this->prepare( $sql )
 			or return undef;
@@ -185,7 +186,7 @@ sub selectall_arrayref {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	return $this->fetchall_arrayref( $res->[$DB_QUERYID] );
+	return $this->fetchall_arrayref( $res->[$DB_QUERYID], $st1 );
 }
 
 sub selectall_hashref {
@@ -242,11 +243,13 @@ PAB3::DB::Max - Additional functions to PAB3::DB
 
   use PAB3::DB::Max;
   
-  @data = $res->fetchall_arrayref();
-  @data = $stmt->fetchall_arrayref();
+  $data = $res->fetchall_arrayref();
+  $data = $res->fetchall_arrayref( {} );
+  $data = $stmt->fetchall_arrayref();
+  $data = $stmt->fetchall_arrayref( {} );
   
-  %data = $res->fetchall_hashref();
-  %data = $stmt->fetchall_hashref();
+  $data = $res->fetchall_hashref( $key );
+  $data = $stmt->fetchall_hashref( $key );
   
   @row = $res->fetchrow_array();
   @row = $stmt->fetchrow_array();
@@ -260,14 +263,25 @@ PAB3::DB::Max - Additional functions to PAB3::DB
   $row = $res->fetchrow_hashref();
   $row = $stmt->fetchrow_hashref();
   
-  $data = $db->selectall_arrayref();
-  $data = $db->selectall_hashref();
+  $data = $db->selectall_arrayref( $statement );
+  $data = $db->selectall_arrayref( $statement, @bind_values );
+  $data = $db->selectall_arrayref( $statement, {} );
+  $data = $db->selectall_arrayref( $statement, {}, @bind_values );
   
-  @row = $db->selectrow_array();
-  $row = $db->selectrow_arrayref();
+  $data = $db->selectall_hashref( $statement, $key );
+  $data = $db->selectall_hashref( $statement, $key, @bind_values );
   
-  %row = $db->selectrow_hash();
-  $row = $db->selectrow_hashref();
+  @row = $db->selectrow_array( $statement );
+  @row = $db->selectrow_array( $statement, @bind_values );
+  
+  $row = $db->selectrow_arrayref( $statement );
+  $row = $db->selectrow_arrayref( $statement, @bind_values );
+  
+  %row = $db->selectrow_hash( $statement );
+  %row = $db->selectrow_hash( $statement, @bind_values );
+  
+  $row = $db->selectrow_hashref( $statement );
+  $row = $db->selectrow_hashref( $statement, @bind_values );
 
 
 =head1 DESCRIPTION
@@ -292,14 +306,14 @@ Once it has been loaded all functions becomes available to I<PAB3::DB>.
 
 =item $stmt -> fetchrow_array ()
 
-fetchrow_array() is a synonym for L<fetch_row()|PAB3::DB/item_fetch_row>
+fetchrow_array() is a synonym for L<fetch_row()|PAB3::DB/fetch_row>
 
 
 =item $res -> fetchrow_hash ()
 
 =item $stmt -> fetchrow_hash ()
 
-fetchrow_hash() is a synonym for L<fetch_hash()|PAB3::DB/item_fetch_hash>
+fetchrow_hash() is a synonym for L<fetch_hash()|PAB3::DB/fetch_hash>
 
 
 =item $res -> fetchrow_arrayref ()
@@ -377,10 +391,11 @@ column names. For example:
 =item $db -> selectrow_array ( $statement, @bind_values )
 
 If I<@bind_values> are not used, this method combines
-L<query()|PAB3::DB/item_query> and L<fetchrow_array()> into a single call.
+L<query()|PAB3::DB/query> and
+L<fetchrow_array()|PAB3::DB::Max/fetchrow_array> into a single call.
 
-If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/item_prepare>,
-L<execute()|PAB3::DB/item_execute> and L<fetchrow_array()>.
+If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/prepare>,
+L<execute()|PAB3::DB/execute> and L<fetchrow_array()|PAB3::DB::Max/fetchrow_array>.
 
 
 =item $db -> selectrow_hash ( $statement )
@@ -388,10 +403,11 @@ L<execute()|PAB3::DB/item_execute> and L<fetchrow_array()>.
 =item $db -> selectrow_hash ( $statement, @bind_values )
 
 If I<@bind_values> are not used, this method combines
-L<query()|PAB3::DB/item_query> and L<fetchrow_hash()> into a single call.
+L<query()|PAB3::DB/query> and L<fetchrow_hash()|PAB3::DB::Max/fetchrow_hash>
+into a single call.
 
-If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/item_prepare>,
-L<execute()|PAB3::DB/item_execute> and L<fetchrow_hash()>.
+If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/prepare>,
+L<execute()|PAB3::DB/execute> and L<fetchrow_hash()|PAB3::DB::Max/fetchrow_hash>.
 
 
 =item $db -> selectrow_arrayref ( $statement )
@@ -399,10 +415,12 @@ L<execute()|PAB3::DB/item_execute> and L<fetchrow_hash()>.
 =item $db -> selectrow_arrayref ( $statement, @bind_values )
 
 If I<@bind_values> are not used, this method combines
-L<query()|PAB3::DB/item_query> and L<fetchrow_arrayref()> into a single call.
+L<query()|PAB3::DB/query> and
+L<fetchrow_arrayref()|PAB3::DB::Max/fetchrow_arrayref> into a single call.
 
-If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/item_prepare>,
-L<execute()|PAB3::DB/item_execute> and L<fetchrow_arrayref()>.
+If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/prepare>,
+L<execute()|PAB3::DB/execute> and
+L<fetchrow_arrayref()|PAB3::DB::Max/fetchrow_arrayref>.
 
 
 =item $db -> selectrow_hashref ( $statement )
@@ -410,21 +428,29 @@ L<execute()|PAB3::DB/item_execute> and L<fetchrow_arrayref()>.
 =item $db -> selectrow_hashref ( $statement, @bind_values )
 
 If I<@bind_values> are not used, this method combines
-L<query()|PAB3::DB/item_query> and L<fetchrow_hashref()> into a single call.
+L<query()|PAB3::DB/query> and
+L<fetchrow_hashref()|PAB3::DB::Max/fetchrow_hashref> into a single call.
 
-If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/item_prepare>,
-L<execute()|PAB3::DB/item_execute> and L<fetchrow_hashref()>.
+If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/prepare>,
+L<execute()|PAB3::DB/execute> and
+L<fetchrow_hashref()|PAB3::DB::Max/fetchrow_hashref>.
 
 
 =item $db -> selectall_arrayref ( $statement )
 
+=item $db -> selectall_arrayref ( $statement, {} )
+
 =item $db -> selectall_arrayref ( $statement, @bind_values )
 
-If I<@bind_values> are not used, this method combines
-L<query()|PAB3::DB/item_query> and L<fetchall_arrayref()> into a single call.
+=item $db -> selectall_arrayref ( $statement, {}, @bind_values )
 
-If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/item_prepare>,
-L<execute()|PAB3::DB/item_execute> and L<fetchall_arrayref()>.
+If I<@bind_values> are not used, this method combines
+L<query()|PAB3::DB/query> and
+L<fetchall_arrayref()|PAB3::DB::Max/fetchall_arrayref> into a single call.
+
+If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/prepare>,
+L<execute()|PAB3::DB/execute> and
+L<fetchall_arrayref()|PAB3::DB::Max/fetchall_arrayref>.
 
 
 =item $db -> selectall_arrayref ( $statement, $key )
@@ -432,10 +458,12 @@ L<execute()|PAB3::DB/item_execute> and L<fetchall_arrayref()>.
 =item $db -> selectall_arrayref ( $statement, $key, @bind_values )
 
 If I<@bind_values> are not used, this method combines
-L<query()|PAB3::DB/item_query> and L<fetchall_hashref()> into a single call.
+L<query()|PAB3::DB/query> and
+L<fetchall_hashref()|PAB3::DB::Max/fetchall_hashref> into a single call.
 
-If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/item_prepare>,
-L<execute()|PAB3::DB/item_execute> and L<fetchall_hashref()>.
+If I<@bind_values> are used, it combines L<prepare()|PAB3::DB/prepare>,
+L<execute()|PAB3::DB/execute> and
+L<fetchall_hashref()|PAB3::DB::Max/fetchall_hashref>.
 
 =back
 
@@ -454,4 +482,3 @@ either the GNU General Public License or the Artistic License, as specified in
 the Perl README file.
 
 =cut
-

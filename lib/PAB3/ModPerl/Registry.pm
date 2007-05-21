@@ -332,7 +332,7 @@ Christian Mueller.
 
 L<http://perl.apache.org>
 
-L<PAB3::CGI>
+L<the PAB3::CGI manpage|PAB3::CGI>
 
 =head1 COPYRIGHT
 

@@ -6,7 +6,7 @@ package PAB3::Session;
 # =============================================================================
 use vars qw($VERSION $SID %_SESSION %Config $Auto_Start $SavePath);
 
-$VERSION = '1.0.4';
+$VERSION = '1.0.5';
 
 use Digest::MD5 ();
 use Storable ();
@@ -19,7 +19,7 @@ require Exporter;
 *import = \&Exporter::import;
 our @EXPORT_OK = ();
 our @EXPORT = qw($SID %_SESSION);
-#our @EXPORT_FNC = qw(start destroy gc write);
+our @EXPORT_FNC = qw(start destroy gc write);
 
 BEGIN {
 	if( ! $GLOBAL::MODPERL ) {
@@ -70,7 +70,14 @@ sub _import {
 	# export symbols
 	*{$callpkg . '::SID'} = \${$pkg . '::SID'};
 	*{$callpkg . '::_SESSION'} = \%{$pkg . '::_SESSION'};
-	*{$callpkg . '::session_' . $_} = \&{$pkg . '::' . $_} foreach @EXPORT_FNC;
+	foreach( @_ ) {
+		if( $_ eq ':default' ) {
+			foreach( @EXPORT_FNC ) {
+				*{$callpkg . '::session_' . $_} = \&{$pkg . '::' . $_};
+			}
+			last;
+		}
+	}
 }
 
 sub cleanup {
@@ -320,7 +327,7 @@ Store session data.
 write() is called internally at the END block or inside ModPerl as cleanup
 callback at the end of each request. If you use PAB3::CGI, it will be
 registered as callback by
-L<PAB3::CGI::cleanup_register|PAB3::CGI/item_cleanup_register>.
+L<PAB3::CGI::cleanup_register|PAB3::CGI/cleanup_register>.
 In other environments, like PerlEx or FastCGI, that do not support cleanup
 mechanism you need to call it by yourself.
 
@@ -352,6 +359,8 @@ Store your session data in the %_SESSION hash.
 =head1 EXPORTS
 
 By default the variables $SID and %_SESSION are exported.
+To export function also use the export tag ':default'.
+Exported functions get the prefix "session_".
 
 =head1 AUTHORS
 

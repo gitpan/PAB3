@@ -16,7 +16,7 @@ no warnings 'numeric';
 use vars qw($VERSION);
 
 BEGIN {
-	$VERSION = '1.1.0';
+	$VERSION = '1.1.1';
 
 	*fetch_array = \&fetch_row;
 	*new = \&connect;
@@ -641,7 +641,7 @@ PAB3::DB - Common interface for database communication
 
 =head1 DESCRIPTION
 
-PAB3::DB provides a an interface for database communication.
+PAB3::DB provides an interface for database communication.
 
 SQL statements can be submitted in two different ways, with 'query' method or
 with 'prepare' and 'execute' methods.
@@ -661,11 +661,11 @@ defines a statement class.
   use PAB3::DB;
   
   $db = PAB3::DB->connect(
-    'driver' => 'Mysql',
-    'host' => 'localhost',
-    'user' => 'root',
-    'auth' => '',
-    'db' => 'test',
+      'driver' => 'Mysql',
+      'host' => 'localhost',
+      'user' => 'root',
+      'auth' => '',
+      'db' => 'test',
   );
   
   $db->set_charset( 'utf8' );
@@ -685,11 +685,11 @@ defines a statement class.
   use PAB3::DB;
   
   $db = PAB3::DB->connect(
-    'driver' => 'Mysql',
-    'host' => 'localhost',
-    'user' => 'root',
-    'auth' => '',
-    'db' => 'test',
+      'driver' => 'Mysql',
+      'host' => 'localhost',
+      'user' => 'root',
+      'auth' => '',
+      'db' => 'test',
   );
   
   $db->set_charset( 'utf8' );
@@ -730,7 +730,7 @@ A combination of the following parameters:
   auth       => authorization password
   db         => database
   port       => port for tcp/ip connection
-  options    => hashref with driver specific options, like "reconnect=>1"
+  options    => hashref with driver specific options, like {reconnect => 1}
   warn       => warns on error, default is ON
   die        => dies on error, default is ON
 
@@ -740,6 +740,19 @@ drivers documentation.
 B<Return Values>
 
 Returns a PAB3::DB class (I<$db>) on success or FALSE on failure. 
+
+B<Examples>
+
+  # loading the driver on startup will speed up the connection process
+  # use PAB3::DB::Driver::Postgres ();
+  
+  $db = PAB3::DB->connect(
+      'driver' => 'Postgres',
+      'host' => 'localhost',
+      'user' => 'postgres',
+      'auth' => 'postgres',
+      'db' => 'mydb',
+  );
 
 
 =item $db -> reconnect ()
@@ -816,11 +829,11 @@ The query, as a string.
 
 B<Return Values>
 
-For selectives queries L<query> returns a result class (I<$res>) on success,
+For selectives queries query() returns a result class (I<$res>) on success,
 or FALSE on error. 
 
-For other type of SQL statements, UPDATE, DELETE, DROP, etc, L<query()>
-returns TRUE on success or FALSE on error. 
+For other type of SQL statements, UPDATE, DELETE, DROP, etc,
+query() returns TRUE on success or FALSE on error. 
 
 
 =item $stmt = $db -> prepare ( $statement )
@@ -844,7 +857,7 @@ Returns a statement class (I<$stmt>) or FALSE if an error occured.
 
 B<See Also>
 
-L<execute()>, L<bind_param()>
+L<execute()|PAB3::DB/execute>, L<bind_param()|PAB3::DB/bind_param>
 
 =item $stmt -> bind_param ( $p_num )
 
@@ -921,9 +934,11 @@ TRUE on success or FALSE on error.
 =item $stmt -> affected_rows ()
 
 Gets the number of affected rows in a previous SQL operation
-After executing a statement with L<query()> or L<execute()>, returns the number
+After executing a statement with L<query()|PAB3::DB/query> or
+L<execute()|PAB3::DB/execute>, returns the number
 of rows changed (for UPDATE), deleted (for DELETE), or inserted (for INSERT).
-For SELECT statements, affected_rows() works like L<num_rows()>. 
+For SELECT statements, affected_rows() works like
+L<num_rows()|PAB3::DB/num_rows>. 
 
 B<Return Values>
 
@@ -996,7 +1011,7 @@ did not update an AUTO_INCREMENT value.
 =item $stmt -> fetch_array ()
 
 Get a result row as an enumerated array.
-L<fetch_array()> is a synonym for L<fetch_row()>.
+fetch_array() is a synonym for fetch_row().
 
 B<Paramters>
 
@@ -1027,7 +1042,7 @@ result set's columns or NULL if there are no more rows in resultset.
 If two or more columns of the result have the same field names, the last
 column will take precedence. To access the other columns of the same name,
 you either need to access the result with numeric indices by using
-L<fetch_row()> or add alias names.
+L<fetch_row()|PAB3::DB/fetch_row> or add alias names.
 
 
 =item $res -> fetch_col ()
@@ -1102,7 +1117,7 @@ B<Paramters>
 
 I<$offset>
 
-Absolute row position. Valid between 0 and L<num_rows()> - 1.
+Absolute row position. Valid between 0 and L<num_rows()|PAB3::DB/num_rows> - 1.
 
 B<Return Values>
 
@@ -1192,7 +1207,8 @@ B<Paramters>
 
 I<$offset>
 
-Absolute field position. Valid between 0 and L<num_fields()> - 1.
+Absolute field position. Valid between 0 and
+L<num_fields()|PAB3::DB/num_fields> - 1.
 
 B<Return Values>
 

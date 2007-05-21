@@ -237,13 +237,13 @@ Example:
   );
 
 
-See also L<PAB-E<gt>add_hashmap|PAB/item_add_hashmap>
+See also L<PAB3-E<gt>add_hashmap|PAB3/add_hashmap>
 
 
 =item load ()
 
-Loads the hashmap cache from file. Is called internally by L<new()> or
-L<PAB3-E<gt>reset|PAB3/item_reset>.
+Loads the hashmap cache from file. Is called internally by
+L<new()|PAB3::HashMapCache/new> or L<PAB3-E<gt>reset|PAB3/reset>.
 
 
 =item save ()
@@ -253,7 +253,7 @@ Write the hashmap cache to disk.
 save() is called internally when the class gets destroyed or inside ModPerl as
 cleanup callback at the end of each request. If you use PAB3::CGI, it will
 be registered as callback by
-L<PAB3::CGI::cleanup_register|PAB3::CGI/item_cleanup_register>.
+L<PAB3::CGI::cleanup_register|PAB3::CGI/cleanup_register>.
 In other environments, like PerlEx or FastCGI, that do not support cleanup
 mechanism you need to call it by yourself.
 
