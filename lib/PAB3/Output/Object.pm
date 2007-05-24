@@ -1,11 +1,13 @@
-package PAB::Output::Object;
+package PAB3::Output::Object;
 
 use strict;
 no strict 'refs';
 
 use vars qw($VERSION);
 
-$VERSION = '1.0.0';
+BEGIN {
+	$VERSION = '1.0.0';
+}
 
 sub TIEHANDLE {
     my $class = shift;

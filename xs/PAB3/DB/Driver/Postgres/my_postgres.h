@@ -69,7 +69,7 @@ typedef struct st_my_cxt {
 	char						lasterror[256];
 } my_cxt_t;
 
-#define MY_CXT_KEY "PAB::DB::Driver::Postgres::_guts" XS_VERSION
+#define MY_CXT_KEY "PAB3::DB::Driver::Postgres::_guts" XS_VERSION
 
 START_MY_CXT
 

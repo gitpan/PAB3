@@ -15,10 +15,10 @@ use Carp ();
 use strict;
 no strict 'refs';
 
-require Exporter;
-*import = \&Exporter::import;
-our @EXPORT_OK = ();
-our @EXPORT = qw($SID %_SESSION);
+#require Exporter;
+#*import = \&Exporter::import;
+#our @EXPORT_OK = ();
+#our @EXPORT = qw($SID %_SESSION);
 our @EXPORT_FNC = qw(start destroy gc write);
 
 BEGIN {
@@ -60,7 +60,7 @@ END {
 
 1;
 
-sub _import {
+sub import {
 	my $pkg = shift;
 	my $callpkg = caller();
 	if( $_[0] and $pkg eq __PACKAGE__ and $_[0] eq 'import' ) {
@@ -253,6 +253,7 @@ PAB3::Session provides an interace to Session Handling Functions in PAB3.
   use PAB3::Session;
   use PAB3::Utils;
   
+  &PAB3::CGI::init();
   &PAB3::Session::start();
   
   if( ! $_SESSION{'time_start'} ) {
@@ -286,7 +287,7 @@ Available arguments are:
                      default is '/tmp'
   name            => name of the session id in %_REQUEST or %_COOKIE
                      default is PABSESSID
-  id              => id of session if PAB3::CGI is not used
+  id              => id of session; needs to be defined if PAB3::CGI is not used
   use_cookies     => store session id in a cookie, default is TRUE
   use_only_cookie => use cookies only, default is FALSE
   cookie_path     => path on the server in which the cookie will be
@@ -316,7 +317,7 @@ Available arguments are:
 Example:
 
   &PAB3::Session::start(
-      'save_path'    => '/path/to/session/',
+      'save_path'    => '/path/to/save/sessions/',
   );
 
 

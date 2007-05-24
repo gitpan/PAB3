@@ -12,7 +12,7 @@ no warnings 'uninitialized';
 use vars qw($VERSION $_CURRENT);
 
 BEGIN {
-	$VERSION = '3.0.2';
+	$VERSION = '3.0.3';
 }
 
 use Carp ();
@@ -638,7 +638,7 @@ sub _build_script_int {
 		}
 		elsif( $item->[$FIELD_TYPE] == $ITEM_SUB ) {
 			$_[1] .= $indent . $item->[$FIELD_CONTENT] . " = sub {\n";
-			$this->_buildScript( $item, $_[1], $_[2] + 1 ) or return 0;
+			$this->_build_script_int( $item, $_[1], $_[2] + 1 ) or return 0;
 			$_[1] .= $indent . "};\n";
 		}
 		elsif( $item->[$FIELD_TYPE] == $ITEM_COMMENT ) {
@@ -1245,7 +1245,8 @@ the record for the loop.
 
 I<$r_type>
 
-the type of the record. One of these constants: PAB_SCALAR or PAB_FUNC
+the type of the record. One of these constants: PAB_SCALAR, PAB_FUNC, PAB_ARRAY
+or PAB_HASH
 
 I<$object>
 
@@ -1481,7 +1482,7 @@ B<Example>
   );
   @fields = ( 'Name', 'Prename', 'Age' );
   
-  $pab->register_loop( 'Person', 'data', PAB_ARRAY, 'per', PAB_SCALAR )
+  $pab->register_loop( 'Person', 'data' => PAB_ARRAY, 'per' => PAB_SCALAR );
   $pab->add_hashmap( 'Person', 'per', \@fields );
   
   $pab->make_script_and_run( 'template' );
@@ -1504,7 +1505,7 @@ See more at L<PAB3::HashMapCache>.
 
 =item reset ()
 
-Resets loops and hashmaps in the PAB class.
+Resets loops and hashmaps in the PAB3 class.
 
 Returns allways a TRUE value.
 
@@ -1531,7 +1532,7 @@ Example:
 
 =back
 
-=head1 PAB LANGUAGE SYNTAX
+=head1 PAB3 LANGUAGE SYNTAX
 
 The little extended language is needed to extract the PAB and Perl elements from
 the rest of the template.
@@ -1580,7 +1581,7 @@ separators. B<All directives are case insensitive>.
 
 Prints the output returned from E<lt>expressionE<gt>.
 B<Performance notice:> Tests are showing the double of speed
-when expressions are combined as strings instead of multiple argmuents.
+when expressions are combined as strings instead of using multiple argmuents.
 For example:
 
    faster:

@@ -234,7 +234,7 @@ PAB3::Logger - Logging extension to PAB3
 PAB3::Logger provides an interace for logging methods.
 
 Depending on the the current LogLevel setting, only logging with the same
-log level or higher will be loaded. For example if the current LogLevel is
+log level or lower will be loaded. For example if the current LogLevel is
 set to warning, only messages with log level of the level warning or
 lower (error) will be logged.
 

@@ -646,8 +646,9 @@ PAB3::DB provides an interface for database communication.
 SQL statements can be submitted in two different ways, with 'query' method or
 with 'prepare' and 'execute' methods.
 The 'query' method is more simple and should run faster for a single call.
-The 'prepare' and 'execute' methods are more secure and can speed the
-execution time if 'execute' is called more times on the same statement.
+The 'prepare' and 'execute' methods are more secure and can speed up the
+execution time if 'execute' is called more times on the same statement. It
+also makes available sending binary data to along with the statement.
 
 Most functions may be used in different ways. The documentation uses the
 following variables to define different classes.

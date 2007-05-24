@@ -23,7 +23,7 @@ our $HMC_LOGGER			= 5;
 our $HMC_CLEANUP		= 6;
 
 BEGIN {
-	$VERSION = '2.0.0';
+	$VERSION = '2.0.1';
 	$MODPERL = 0;
 	$MODPERL = 2 if exists $ENV{'MOD_PERL_API_VERSION'}
 		&& $ENV{'MOD_PERL_API_VERSION'} == 2;
@@ -44,7 +44,7 @@ BEGIN {
 		;
 	}
 	else {
-		$TEMDIR = '/tmp/';
+		$TEMPDIR = '/tmp/';
 	}
 }
 
@@ -193,7 +193,7 @@ __END__
 
 =head1 NAME
 
-PAB3::HashMapCache - Cache handler for hashmaps in PAB
+PAB3::HashMapCache - Cache handler for hashmaps in PAB3
 
 =head1 SYNOPSIS
 
@@ -207,7 +207,7 @@ PAB3::HashMapCache - Cache handler for hashmaps in PAB
 =head1 DESCRIPTION
 
 C<PAB3::HashMapCache> provides an interface to cache hashes that maps to arrays.
-One time it is added to the PAB class, it will be internally used by it.
+One time it is added to the PAB3 class, it will be used by it automatically.
 
 =head1 METHODS
 

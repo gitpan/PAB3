@@ -93,7 +93,7 @@ typedef struct st_my_thread_var {
 	my_vdatetime_t				time_struct;
 } my_thread_var_t;
 
-#define MY_CXT_KEY "PAB::Utils::_guts" XS_VERSION
+#define MY_CXT_KEY "PAB3::Utils::_guts" XS_VERSION
 
 typedef struct st_my_cxt {
 	char						locale_path[256]; 

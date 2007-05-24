@@ -117,7 +117,7 @@ __END__
 
 =head1 NAME
 
-PAB3::DB::Driver::Sqlite3 - Perl wrapper to libsqlite3 and driver for the
+PAB3::DB::Driver::Sqlite3 - Perl5 wrapper to libsqlite3 and driver for the
 PAB3::DB class
 
 See more at L<the PAB3::DB manpage|PAB3::DB>
