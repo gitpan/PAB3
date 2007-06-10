@@ -4,10 +4,6 @@ package PAB3::Session;
 # Module: PAB3::Session
 # Use "perldoc PAB3::Session" for documenation
 # =============================================================================
-use vars qw($VERSION $SID %_SESSION %Config $Auto_Start $SavePath);
-
-$VERSION = '1.0.5';
-
 use Digest::MD5 ();
 use Storable ();
 use Carp ();
@@ -15,13 +11,10 @@ use Carp ();
 use strict;
 no strict 'refs';
 
-#require Exporter;
-#*import = \&Exporter::import;
-#our @EXPORT_OK = ();
-#our @EXPORT = qw($SID %_SESSION);
-our @EXPORT_FNC = qw(start destroy gc write);
+use vars qw($VERSION $SID %_SESSION %Config $DefaultPath);
 
 BEGIN {
+	$VERSION = '1.0.6';
 	if( ! $GLOBAL::MODPERL ) {
 		$GLOBAL::MODPERL = 0;
 		$GLOBAL::MODPERL = 2 if exists $ENV{'MOD_PERL_API_VERSION'}
@@ -41,14 +34,14 @@ BEGIN {
 		require Apache::Log;
 	}
 	if( $^O eq 'MSWin32' ) {
-		$SavePath = Win32::GetLongPathName(
+		$DefaultPath = Win32::GetLongPathName(
 			$ENV{'TEMP'}
 			# CSIDL_WINDOWS (0x0024)
 			|| Win32::GetFolderPath( 0x0024 ) . "\\Temp"
 		);
 	}
 	else {
-		$SavePath = '/tmp';
+		$DefaultPath = '/tmp';
 	}
 }
 
@@ -57,6 +50,8 @@ END {
 		&cleanup;
 	}
 }
+
+our @EXPORT_FNC = qw(start destroy gc write);
 
 1;
 
@@ -90,7 +85,7 @@ sub start {
 	my( $hr, $file, $index, $len );
 	$len = scalar( @_ );
 	%Config = (
-		'save_path' => $SavePath,
+		'save_path' => $DefaultPath,
 		'name' => 'PABSESSID',
 		'gc_max_lifetime' => 1440,
 		'gc_probality' => 1,
@@ -159,13 +154,18 @@ sub start {
 }
 
 sub read {
-	my( $file, $data );
+	my( $file, $data, $fd );
 	$file = $Config{'save_path'} . '/pses_' . $SID;
 	return 1 if ! -e $file;
+	open( $fd, '<' . $file )
+		or &Carp::croak( "can't open file: $!" );
+	flock( $fd, 1 );
 	eval {
 		local( $SIG{'__DIE__'}, $SIG{'__WARN__'} );
-		$data = &Storable::lock_retrieve( $file );
+		$data = &Storable::retrieve_fd( $fd );
 	};
+	flock( $fd, 8 );
+	close( $fd );
 	if( $@ ) {
 		&Carp::croak( $@ );
 	}
@@ -174,16 +174,21 @@ sub read {
 }
 
 sub write {
-	my( $file );
+	my( $file, $fd );
 	return 1 if ! $SID;
 	if( ! %_SESSION ) {
 		return &destroy();
 	}
 	$file = $Config{'save_path'} . '/pses_' . $SID;
+	open( $fd, '>' . $file )
+		or &Carp::croak( "can't open file: $!" );
+	flock( $fd, 2 );
 	eval {
 		local( $SIG{'__DIE__'}, $SIG{'__WARN__'} );
-		&Storable::lock_store( \%_SESSION, $file );
+		&Storable::store_fd( \%_SESSION, $fd );
 	};
+	flock( $fd, 2 );
+	close( $fd );
 	if( $@ ) {
 		&Carp::croak( $@ );
 	}

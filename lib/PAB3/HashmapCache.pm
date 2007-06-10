@@ -1,4 +1,4 @@
-package PAB3::HashMapCache;
+package PAB3::HashmapCache;
 # =============================================================================
 # Perl Application Builder
 # Module: PAB3::HashMapCache
@@ -23,7 +23,7 @@ our $HMC_LOGGER			= 5;
 our $HMC_CLEANUP		= 6;
 
 BEGIN {
-	$VERSION = '2.0.1';
+	$VERSION = '2.1.0';
 	$MODPERL = 0;
 	$MODPERL = 2 if exists $ENV{'MOD_PERL_API_VERSION'}
 		&& $ENV{'MOD_PERL_API_VERSION'} == 2;
@@ -46,6 +46,8 @@ BEGIN {
 	else {
 		$TEMPDIR = '/tmp/';
 	}
+	*read = \&load;
+	*write = \&save;
 }
 
 1;
@@ -119,7 +121,7 @@ sub get {
 	my $this = shift;
 	#my( $loop, $hashname, $fm ) = @_;
 	my( $id );
-	$id = $_[0] . '_' . $_[1];
+	$id = ( $_[0] || '_ROOT' ) . '_' . $_[1];
 	if( $this->[$HMC_DATA]->{$id} ) {
 		if( $_[2] && %{$_[2]} ) {
 			if( join( '', keys %{ $_[2] } )
@@ -137,7 +139,7 @@ sub set {
 	my $this = shift;
 	#my( $loop, $hashname, $hashmap );
 	my( $id );
-	$id = $_[0] . '_' . $_[1];
+	$id = ( $_[0] || '_ROOT' ) . '_' . $_[1];
 	$this->[$HMC_DATA]->{$id} = $_[2];
 	$this->[$HMC_DATA_CHANGED] = 1;
 	return 1;
@@ -145,18 +147,25 @@ sub set {
 
 sub load {
 	my $this = shift;
-	my( $file, $mtime, $data );
+	my( $file, $mtime, $data, $fh );
 	$file = $this->[$HMC_PATH_CACHE] . $this->[$HMC_CACHE_FILE];
 	return 1 if ! -e $file;
 	$mtime = ( stat( $file ) )[9];
 	return 1 if $mtime == $this->[$HMC_CACHE_FILE_MT];
 	if( $this->[$HMC_LOGGER] ) {
-		$this->[$HMC_LOGGER]->debug( "Load hashmap cache from $file" );
+		$this->[$HMC_LOGGER]->debug( "Load hashmap cache from \"$file\"" );
 	}
+	open( $fh, '<' . $file ) or do {
+		&Carp::carp( "can't open $file: $!" );
+		return 0;
+	};
+	flock( $fh, 1 );
 	eval {
 		local( $SIG{'__DIE__'}, $SIG{'__WARN__'} );
-		$data = &Storable::lock_retrieve( $file );
+		$data = &Storable::retrieve_fd( $fh );
 	};
+	flock( $fh, 8 );
+	close( $fh );
 	if( $@ ) {
 		&Carp::carp( "Could not load hashmap file: $@" );
 		return 0;		
@@ -169,16 +178,23 @@ sub load {
 
 sub save {
 	my $this = shift;
-	my( $file, $mtime, $data );
+	my( $file, $data, $fh );
 	$file = $this->[$HMC_PATH_CACHE] . $this->[$HMC_CACHE_FILE];
 	return 1 if ! $this->[$HMC_DATA_CHANGED] && -e $file;
 	if( $this->[$HMC_LOGGER] ) {
-		$this->[$HMC_LOGGER]->debug( "Save hashmap cache to $file" );
+		$this->[$HMC_LOGGER]->debug( "Store hashmap cache at \"$file\"" );
 	}
+	open( $fh, '>' . $file ) or do {
+		&Carp::carp( "can't open $file: $!" );
+		return 0;
+	};
+	flock( $fh, 2 );
 	eval {
 		local( $SIG{'__DIE__'}, $SIG{'__WARN__'} );
-		&Storable::lock_store( $this->[$HMC_DATA], $file );
+		&Storable::store_fd( $this->[$HMC_DATA], $fh );
 	};
+	flock( $fh, 8 );
+	close( $fh );
 	if( $@ ) {
 		&Carp::carp( "Could not save hashmap file: $@" );
 	}
@@ -193,20 +209,20 @@ __END__
 
 =head1 NAME
 
-PAB3::HashMapCache - Cache handler for hashmaps in PAB3
+PAB3::HashmapCache - Caches hashmaps used in PAB3
 
 =head1 SYNOPSIS
 
   use PAB3;
-  use PAB3::HashMapCache;
+  use PAB3::HashmapCache;
   
   $pab = PAB3->new(
-      'hashmap_cache' => PAB3::HashMapCache->new(),
+      'hashmap_cache' => PAB3::HashmapCache->new(),
   );
 
 =head1 DESCRIPTION
 
-C<PAB3::HashMapCache> provides an interface to cache hashes that maps to arrays.
+C<PAB3::HashmapCache> provides an interface to cache hashes that maps to arrays.
 One time it is added to the PAB3 class, it will be used by it automatically.
 
 =head1 METHODS
@@ -215,7 +231,7 @@ One time it is added to the PAB3 class, it will be used by it automatically.
 
 =item new ( [%arg] )
 
-Creates a new class of PAB3::HashMapCache and loads the hashmap cache from file
+Creates a new class of PAB3::HashmapCache and loads the hashmap cache from file
 if it exists.
 
 posible arguments are:
@@ -228,7 +244,7 @@ posible arguments are:
 
 Example:
 
-  $hmc = PAB3::HashMapCache->new(
+  $hmc = PAB3::HashmapCache->new(
       'path_cache'     => '/path/to/cache',
       'cache_file'     => 'hashmap.cache',
   );
@@ -243,7 +259,7 @@ See also L<PAB3-E<gt>add_hashmap|PAB3/add_hashmap>
 =item load ()
 
 Loads the hashmap cache from file. Is called internally by
-L<new()|PAB3::HashMapCache/new> or L<PAB3-E<gt>reset|PAB3/reset>.
+L<new()|PAB3::HashmapCache/new> or L<PAB3-E<gt>reset|PAB3/reset>.
 
 
 =item save ()

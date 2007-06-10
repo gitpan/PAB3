@@ -358,135 +358,95 @@ sub header {
 }
 
 sub print_hash {
-	my( $hashname, $title, $ref_table ) = @_;
-	my( $r_hash, $index, $r, $k );
+	my( $hashname, $ref_table, $level ) = @_;
+	my( $r_hash, $r, $k );
 	$ref_table ||= [];
 	if( $hashname =~ /HASH\(0x\w+\)/ ) {
 		$r_hash = $hashname;
-		$hashname = $title;
 	}
 	else {
-		if( defined $hashname ) {
-			print "<p><pre>\n$hashname\n</pre></p>\n";
-		}
 		return;
 	}
-	print '<p><table border="1" cellspacing="0" cellpadding="2">', "\n";
-	if( defined $hashname ) {
-		print '<tr><th colspan="3">%' . $hashname . "</th></tr>\n";
+	print $r_hash;
+	if( $ref_table->{$r_hash} && $ref_table->{$r_hash} <= $level ) {
+		print " [recursive loop]\n";
+		return;
 	}
-	foreach( @$ref_table ) {
-		if( $_ eq $r_hash ) {
-			print "</table></p>\n";
-			return;
-		}
-	}
-	push @$ref_table, $r_hash;
-	$index = 1;
+	print "\n", "    " x $level, "(\n";
+	$ref_table->{$r_hash} = $level + 1;
 	foreach $k( sort { lc( $a ) cmp lc( $b ) } keys %{ $r_hash } ) {
-		print
-			'<tr><td>' . $index . '</td><td>' . ( $k || '&nbsp;' )
-			. "</td><td>\n"
-		;
-		$r = ref( $r_hash->{ $k } );
-		if( $r && index( $r_hash->{ $k }, 'ARRAY(' ) >= 0 ) {
-			print '[' . $r_hash->{ $k } . "]\n";
-			&print_array( $r_hash->{ $k }, undef, $ref_table );
+		print "    " x ( $level + 1 ) . "[$k] => ";
+		$r = ref( $r_hash->{$k} );
+		if( $r && index( $r_hash->{$k}, 'ARRAY(' ) >= 0 ) {
+			&print_array( $r_hash->{$k}, $ref_table, $level + 1 );
 		}
-		if( $r && index( $r_hash->{ $k }, 'HASH(' ) >= 0 ) {
-			print '[' . $r_hash->{ $k } . "]\n";
-			&print_hash( $r_hash->{ $k }, undef, $ref_table );
+		elsif( $r && index( $r_hash->{$k}, 'HASH(' ) >= 0 ) {
+			&print_hash( $r_hash->{$k}, $ref_table, $level + 1 );
 		}
 		else {
-			print
-				defined $r_hash->{ $k } && length( $r_hash->{ $k } )
-					? $r_hash->{ $k }
-					: '&nbsp;'
-				, "\n"
-			;
+			print ( ! defined $r_hash->{$k} ? '(null)' : $r_hash->{ $k } );
+			print "\n";
 		}
-		print "</td></tr>\n";
-		$index ++;
 	}
-	print "</table></p>\n";
+	print "    " x $level, ")\n";
 }
 
 sub print_array {
-	my( $arrayname, $title, $ref_table ) = @_;
-	my( $r_array, $r, $v );
-	$ref_table ||= [];
-	if( ref( $arrayname ) eq 'ARRAY' ) {
+	my( $arrayname, $ref_table, $level ) = @_;
+	my( $r_array, $r, $v, $i );
+	$ref_table ||= {};
+	$level ||= 0;
+	if( $arrayname =~ /ARRAY\(0x\w+\)/ ) {
 		$r_array = $arrayname;
-		$arrayname = $title;
 	}
 	else {
-		if( defined $arrayname ) {
-			print "<p><pre>\n$arrayname\n</pre></p>\n";
-		}
 		return;
 	}
-	print '<p>';
-	if( defined $arrayname ) {
-		print '<strong>@' . $arrayname . '</strong>';
+	print $r_array;
+	if( $ref_table->{$r_array} && $ref_table->{$r_array} <= $level ) {
+		print " [recursive loop]\n";
+		return;
 	}
-	foreach( @$ref_table ) {
-		if( $_ eq $r_array ) {
-			print "</p>\n";
-			return;
-		}
-	}
-	push @$ref_table, $r_array;
-	print "<ol>\n" ;
+	print "\n", "    " x $level, "(\n";
+	$ref_table->{$r_array} = $level + 1;
+	$i = 0;
 	foreach $v( @{ $r_array } ) {
 		$r = ref( $v );
+		print "    " x ( $level + 1 ) . "[$i] => ";
 		if( $r && index( $v, 'ARRAY(' ) >= 0 ) {
-			print '<li>[' . $v . ']';
-			&print_array( $v, undef, $ref_table );
-			print "</li>\n";
+			&print_array( $v, $ref_table, $level + 1 );
 		}
-		if( $r && index( $v, 'HASH(' ) >= 0 ) {
-			print '<li>[', $v, "]\n";
-			&print_hash( $v, undef, $ref_table );
-			print "</li>\n";
+		elsif( $r && index( $v, 'HASH(' ) >= 0 ) {
+			&print_hash( $v, $ref_table, $level + 1 );
 		}
 		else {
-			print
-				'<li>'
-				. ( defined $v && length( $v ) ? $v : '&nbsp;' )
-				. "</li>\n"
-			;
+			print "" . ( ! defined $v ? '(null)' : $v ) . "\n";
 		}
+		$i ++;
 	}
-	print "</ol></p>\n";
-}
-
-sub print_text {
-	my( $t );
-	foreach $t( @_ ) {
-		if( defined $t ) {
-			print "<p><pre>\n${t}\n</pre></p>\n";
-		}
-	}
+	print "    " x $level, ")\n";
 }
 
 sub print_var {
 	my( $v, $r, $ref_table );
-	$ref_table = [];
+	$ref_table = {};
+	print "<pre>\n";
 	foreach $v( @_ ) {
 		$r = ref( $v );
 		if( $r && index( $v, 'ARRAY(' ) >= 0 ) {
-			&print_array( $v, undef, $ref_table );
+			&print_array( $v, $ref_table, 0 );
 		}
 		elsif( $r && index( $v, 'HASH(' ) >= 0 ) {
-			&print_hash( $v, undef, $ref_table );
+			&print_hash( $v, $ref_table, 0 );
 		}
 		elsif( $r && index( $v, 'SCALAR(' ) >= 0 ) {
-			&print_text( $$v );
+			print $$v, "\n";
 		}
 		else {
-			&print_text( $v );
+			print $v, "\n";
 		}
 	}
+	print "</pre>\n";
 }
 
 sub print_code {

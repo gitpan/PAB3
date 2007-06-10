@@ -1,2 +1,10 @@
 Revision history for Perl extension PAB3.
 
+version 3.1.0
+    - template parser rewritten in XS and C
+    - predefined loop "FOR" has been removed
+    - now loops can be written directly in the template without loosing the
+      control about hashmaps
+    - functions PAB3::make_script and PAB3::run_script are deprecated and has
+      been removed
+    - PAB3::HashMapCache has been renamed into PAB3::HashmapCache

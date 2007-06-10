@@ -497,9 +497,9 @@ CLEANUP:
 
 char *
 _strfmon( tid, format, number )
-UV tid
-const char *format
-double number
+	UV tid;
+	const char *format;
+	double number;
 PREINIT:
 	my_thread_var_t *tv;
 CODE:

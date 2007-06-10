@@ -1,7 +1,7 @@
-PAB3 version 3.0.3
+PAB3 version 3.1.0
 ==================
 
-PAB3 contains a framework to build rapid applications. It uses
+PAB3 contains a framework for building rapid applications. It uses
 templates to produce output. The templates are translated into
 perl scripts before running them. This should perform the maximum of speed.
 PAB3 also can handle database connections and provides an easy to use
@@ -26,9 +26,8 @@ Use "perl Makefile.PL --help" to get a list of avaiable options.
 
 DEPENDENCIES
 
-This module may require these other modules and libraries:
+This library may require these other modules and libraries:
 
-Digest::MD5
 Storable
 Time::HiRes
 

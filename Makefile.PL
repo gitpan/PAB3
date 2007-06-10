@@ -54,7 +54,7 @@ foreach( @ARGV ) {
 
 WriteMakefile(
     NAME => 'PAB3',
-    VERSION_FROM => 'lib/PAB3.pm',
+    VERSION_FROM => 'xs/PAB3/PAB3.pm',
     ABSTRACT => 'PAB - Perl Application Builder',
     PREREQ_PM => {
         'Time::HiRes' => 0,
@@ -75,7 +75,7 @@ Options:
 
     --with-mysql[=DIR]   Include MySQL support. DIR is the MySQL base directory or the path to mysql_config
     --with-pgsql[=DIR]   Include PostgreSQL support. DIR is the PostgreSQL base install directory or the path to pg_config
-    --with-sqlite3[=DIR]  Include SQLite3 support. DIR is the QSLite3 base install directory
+    --with-sqlite3[=DIR]  Include SQLite3 support. DIR is the SQLite3 base install directory
     --enable-sqlite3-metadata   Enable SQLite3 column metadata. SQLite3 must be compiled with SQLITE_ENABLE_COLUMN_METADATA preprocessor symbol
 
     --disable-mysql      Disable MySQL support. Enabled by default
