@@ -1,6 +1,8 @@
 $src_path = 'locale/';
 $dst_path = '../../../blib/arch/auto/PAB3/Utils/locale/';
-mkdir( $dst_path );
+if( ! -d $dst_path ) {
+	mkdir( $dst_path ) or warn "Can not create dir $dst_path: $!";
+}
 opendir( $dh, $src_path );
 while( $file = readdir( $dh ) ) {
 	next if substr( $file, 0, 1 ) eq '.';

@@ -22,7 +22,9 @@ sub file_copy {
 sub dir_copy {
 	my( $src, $dst ) = @_;
 	my( $dh, $item );
-	mkdir( $dst );
+	if( ! -d $dst ) {
+		mkdir( $dst ) or warn "Can not create dir $dst: $!";
+	}
 	opendir( $dh, $src );
 	while( $item = readdir( $dh ) ) {
 		next if substr( $item, 0, 1 ) eq '.';

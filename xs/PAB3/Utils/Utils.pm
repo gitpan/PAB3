@@ -23,7 +23,7 @@ our %EXPORT_TAGS = (
 *import = \&Exporter::import;
 
 BEGIN {
-	$VERSION = '1.0.0';
+	$VERSION = '1.0.1';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	
@@ -58,7 +58,7 @@ sub new {
 }
 
 sub DESTROY {
-	my $this = shift || return;
+	my $this = shift or return;
 	if( $this->[$PU_TID] ) {
 		&_cleanup_class( $this->[$PU_TID] );
 	}
@@ -195,7 +195,7 @@ create independend objects.
 
 =head2 Exporting goodies
 
-  use PAB3::Utils qw(:default); # localtime and gmtime is not exported
+  use PAB3::Utils qw(:default); # localtime and gmtime are not exported
   
   set_timezone( 'Europe/Berlin' );
   set_locale( 'de_DE.UTF-8' );

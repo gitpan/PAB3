@@ -62,6 +62,7 @@ WriteMakefile(
         'Storable' => 0,
     },
     XSPROTOARG => '-prototypes',
+    OPTIMIZE => '-O3',
     DIR => [ 'xs' ],
 );
 

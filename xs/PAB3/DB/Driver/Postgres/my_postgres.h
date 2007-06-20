@@ -62,6 +62,7 @@ typedef struct st_my_con {
 	DWORD						client_flag;
 	DWORD						affected_rows;
 	char						my_error[256];
+	DWORD						stmt_counter;
 } MY_CON;
 
 typedef struct st_my_cxt {

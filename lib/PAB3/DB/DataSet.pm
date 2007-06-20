@@ -18,6 +18,7 @@ BEGIN {
 	$VERSION = '1.0.0';
 
 	*append = \&insert;
+	*append_record = \&insert_record;
 }
 
 use constant {
@@ -26,12 +27,14 @@ use constant {
 	ctTable					=> 2,
 	ctStoredProcedure		=> 3,
 	# State constants
+	dsSetKey				=> 4,
 	dsInsert				=> 3,
 	dsEdit					=> 2,
 	dsBrowse				=> 1,
 };
 
-# using variables instead of constants because it needs less memory (perl/5.8.8)
+# using variables instead of constants because it needs less of memory
+# (perl/5.8.8)
 our $IDA_DB				= 0;
 our $IDA_CMD_TEXT		= 1;
 our $IDA_CMD_TYPE		= 2;
@@ -54,8 +57,11 @@ our $IDA_PAB			= 18;
 our $IDA_OBJECTNAME		= 19;
 our $IDA_ENUMPOINTER	= 20;
 our $IDA_INITOFFSET		= 21;
+our $IDA_SEARCH			= 22;
+our $IDA_KEY_INFO		= 23;
+our $IDA_CMD_TEXT_PLAIN	= 24;
 
-our $IDA_LASTINDEX 		= 21;
+our $IDA_LASTINDEX 		= 24;
 
 our $IDA_OPT_CALCLIMIT	= 1;
 our $IDA_OPT_CALCROWS	= 2;
@@ -110,14 +116,17 @@ sub new {
 		$ida->[$IDA_LIMIT] = 1;
 		$ida->[$IDA_OPTIONS] = $IDA_OPT_CALCLIMIT;
 	}
+	if( $arg{'filter'} ) {
+		$ida->[$IDA_FILTER] = $this->_format_sql( $arg{'filter'} );
+	}
 	$this->command_type( $arg{'command_type'} ) if $arg{'command_type'};
 	$this->command_text( $arg{'command_text'} ) if $arg{'command_text'};
 	return $this;
 }
 
 #sub DESTROY {
-#	my $this = shift;
-#	$this->close();
+#	my $this = shift or return;
+#	&close( $this );
 #}
 
 sub open {
@@ -345,11 +354,32 @@ sub insert {
 	$ida->[$IDA_SAVEPOINTER] = $ida->[$IDA_POINTER];
 	$ida->[$IDA_POINTER] = $ida->[$IDA_ROWMAX];
 	$ida->[$IDA_STATE] = dsInsert;
-	foreach ( @{ $ida->[$IDA_NAMES] } ) {
+	foreach ( @{$ida->[$IDA_NAMES]} ) {
 		delete $this->{ $_ };
 	}
 	$ida->[$IDA_SAFEFIELDS] = {};
 	return 1;
+}
+
+sub insert_record {
+	my( $this, $ida, $i, $names, $sfields );
+	$this = shift;
+	$ida = $this->{'__I#D#A__'};
+	$this->_verify_dataset( 1 ) or return 0;
+	if( $ida->[$IDA_STATE] != dsBrowse ) {
+		$this->post() or return 0;
+	}
+	$this->_table_info() or return 0;
+	$ida->[$IDA_SAVEPOINTER] = $ida->[$IDA_POINTER];
+	$ida->[$IDA_POINTER] = $ida->[$IDA_ROWMAX];
+	$ida->[$IDA_STATE] = dsInsert;
+	$ida->[$IDA_SAFEFIELDS] = {};
+	$names = $ida->[$IDA_NAMES];
+	$sfields = $ida->[$IDA_SAFEFIELDS];
+	for $i( 0 .. $#{$names} ) {
+		$sfields->{$names->{$i}} = $this->{$names->{$i}} = $_[$i];
+	}
+	return $this->post();
 }
 
 sub post {
@@ -479,6 +509,7 @@ sub command_text {
 		if( $ida->[$IDA_STATE] != dsBrowse ) {
 			$this->post() or return 0;
 		}
+		$ida->[$IDA_CMD_TEXT_PLAIN] = $_[0];
 		$ida->[$IDA_CMD_TEXT] = $this->_format_sql( $_[0] );
 		if( $ida->[$IDA_ROWCOUNT] ) {
 			$this->open() or return 0;
@@ -502,7 +533,16 @@ sub current_record {
 sub fields {
 	my $this = shift;
 	my $ida = $this->{'__I#D#A__'};
-	return @{ $ida->[$IDA_NAMES] };
+	if( defined $_[0] ) {
+		return $ida->[$IDA_NAMES]->[$_[0]];
+	}
+	return @{$ida->[$IDA_NAMES]};
+}
+
+sub field_count {
+	my $this = shift;
+	my $ida = $this->{'__I#D#A__'};
+	return scalar @{$ida->[$IDA_NAMES]};
 }
 
 sub filter {
@@ -513,9 +553,9 @@ sub filter {
 			$this->post() or return 0;
 		}
 		$ida->[$IDA_FILTER] = $this->_format_sql( $_[0] );
-		if( $ida->[$IDA_ROWCOUNT] ) {
-			$this->open() or return 0;
-		}
+#		if( $ida->[$IDA_ROWCOUNT] ) {
+#			$this->open() or return 0;
+#		}
 	}
 	return $ida->[$IDA_FILTER];
 }
@@ -527,8 +567,8 @@ sub limit {
 		if( $ida->[$IDA_STATE] != dsBrowse ) {
 			$this->post() or return 0;
 		}
-		return $ida->[$IDA_LIMIT] if $ida->[$IDA_LIMIT] == $_[0];
-		$ida->[$IDA_LIMIT] = $_[0];
+#		return $ida->[$IDA_LIMIT] if $ida->[$IDA_LIMIT] == $_[0];
+		$ida->[$IDA_LIMIT] = $_[0] > 0 ? $_[0] : 1;
 		if( ( $ida->[$IDA_OPTIONS] & $IDA_OPT_CALCLIMIT ) != 0 ) {
 			$ida->[$IDA_OPTIONS] ^= $IDA_OPT_CALCLIMIT;
 		}
@@ -556,6 +596,144 @@ sub offset {
 	return $ida->[$IDA_OFFSET];
 }
 
+sub locate {
+	my( $this, $ida, $db, $i, $tmp, $res, $sqlrows, $oo );
+	$this = shift;
+	$ida = $this->{'__I#D#A__'};
+	$db = $ida->[$IDA_DB];
+	if( ! ref( $_[0] ) ) {
+		$ida->[$IDA_SEARCH] = $db->quote_id( $_[0] )
+			. ( defined $_[1] ? ' = ' . $db->quote( $_[1] ) : ' IS NULL' );
+	}
+	else {
+		$tmp = '';
+		$_[1] ||= [];
+		for $i( 0 .. $#{$_[0]} ) {
+			$tmp .= ' AND ' if $i;
+			$tmp .= $db->quote_id( $_[0]->[$i] )
+			. ( defined $_[1]->[$i] ? ' = ' . $db->quote( $_[1]->[$i] ) : ' IS NULL' );
+		}
+		$ida->[$IDA_SEARCH] = $tmp;
+	}
+	$oo = $ida->[$IDA_OFFSET];
+	$ida->[$IDA_OFFSET] = 0;
+	$ida->[$IDA_OPTIONS] |= $IDA_OPT_CALCROWS;
+	( $sqlrows, $tmp ) = $this->_prepare_query() or return 0;
+	$ida->[$IDA_OPTIONS] ^= $IDA_OPT_CALCROWS;
+	$res = $db->query( $tmp ) or return 0;
+	if( $res->num_rows() ) {
+		$ida->[$IDA_RESULT] = $res;
+		$ida->[$IDA_ROWCOUNT] = $res->num_rows();
+		$ida->[$IDA_NAMES] = [ $res->fetch_names() ];
+		if( $sqlrows ) {
+			$res = $db->query( $sqlrows ) or return 0;
+			( $ida->[$IDA_ROWMAX] ) = $res->fetch_row();
+		}
+		else {
+			$ida->[$IDA_ROWMAX] = $ida->[$IDA_ROWCOUNT];
+		}
+		my @row = $ida->[$IDA_RESULT]->fetch_row() or return 0;
+		$this->_apply( \@row );
+		$ida->[$IDA_POINTER] = $ida->[$IDA_OFFSET];
+	}
+	else {
+		$ida->[$IDA_OFFSET] = $oo;
+		return 0;
+	}
+	return 1;
+}
+
+sub find_key {
+	my( $this, $ida, $db, $i, $num_fields, $field, @pk, @uk, $tmp, $oo, $res,
+		$sqlrows );
+	$this = shift;
+	$ida = $this->{'__I#D#A__'};
+	$db = $ida->[$IDA_DB];
+	$this->_table_info() or return 0;
+	$num_fields = scalar @{ $ida->[$IDA_TABLE_INFO] };
+	for $i( 0 .. $num_fields - 1 ) {
+		$field = $ida->[$IDA_TABLE_INFO][$i];
+		if( $field->[$PAB3::DB::DB_FIELD_PRIKEY] ) {
+			push @pk, $field->[$PAB3::DB::DB_FIELD_NAME];
+		}
+		elsif( $field->[$PAB3::DB::DB_FIELD_UNIKEY] ) {
+			push @uk, $field->[$PAB3::DB::DB_FIELD_NAME];
+		}
+	}
+	if( @pk ) {
+		for $i( 0 .. $#pk ) {
+			$tmp .= ' AND ' if $i;
+			$tmp .= $db->quote_id( $pk[$i] )
+				. ( defined $_[$i] ? ' = ' . $db->quote( $_[$i] ) : ' IS NULL' );
+		}
+		$ida->[$IDA_SEARCH] = $tmp;
+	}
+	elsif( @uk ) {
+		for $i( 0 .. $#uk ) {
+			$tmp .= ' AND ' if $i;
+			$tmp .= $db->quote_id( $uk[$i] )
+				. ( defined $_[$i] ? ' = ' . $db->quote( $_[$i] ) : ' IS NULL' );
+		}
+		$ida->[$IDA_SEARCH] = $tmp;
+	}
+	else {
+		return 0;
+	}
+	$oo = $ida->[$IDA_OFFSET];
+	$ida->[$IDA_OFFSET] = 0;
+	$ida->[$IDA_OPTIONS] |= $IDA_OPT_CALCROWS;
+	( $sqlrows, $tmp ) = $this->_prepare_query() or return 0;
+	$ida->[$IDA_OPTIONS] ^= $IDA_OPT_CALCROWS;
+	$res = $db->query( $tmp ) or return 0;
+	if( $res->num_rows() ) {
+		$ida->[$IDA_RESULT] = $res;
+		$ida->[$IDA_ROWCOUNT] = $res->num_rows();
+		$ida->[$IDA_NAMES] = [ $res->fetch_names() ];
+		if( $sqlrows ) {
+			$res = $db->query( $sqlrows ) or return 0;
+			( $ida->[$IDA_ROWMAX] ) = $res->fetch_row();
+		}
+		else {
+			$ida->[$IDA_ROWMAX] = $ida->[$IDA_ROWCOUNT];
+		}
+		my @row = $ida->[$IDA_RESULT]->fetch_row() or return 0;
+		$this->_apply( \@row );
+		$ida->[$IDA_POINTER] = $ida->[$IDA_OFFSET];
+	}
+	else {
+		$ida->[$IDA_OFFSET] = $oo;
+		return 0;
+	}
+	return 1;
+}
+
+sub index_defs {
+	my( $this, $ida, $db, %index, $key, @index );
+	$this = shift;
+	$ida = $this->{'__I#D#A__'};
+	if( $ida->[$IDA_CMD_TYPE] != ctTable ) {
+		return $this->_set_error( 'Not available on a non TABLE dataset' );
+	}
+	$db = $ida->[$IDA_DB];
+	return $ida->[$IDA_KEY_INFO] if $ida->[$IDA_KEY_INFO];
+	foreach( $db->show_index( $ida->[$IDA_CMD_TEXT_PLAIN] ) ) {
+		$key = $_->[$PAB3::DB::DB_INDEX_NAME];
+		if( ! $index{$key} ) {
+			$index{$key} = {
+				'name' => $key,
+				'fields' => $_->[$PAB3::DB::DB_INDEX_COLUMN],
+				'type' => $_->[$PAB3::DB::DB_INDEX_TYPE]
+			};
+			push @index, $index{$key};
+		}
+		else {
+			$index{$key}->{'fields'} .= ';' . $_->[$PAB3::DB::DB_INDEX_COLUMN];
+		}
+	}
+	$ida->[$IDA_KEY_INFO] = \@index;
+	return $ida->[$IDA_KEY_INFO];
+}
+
 sub register_loop {
 	my $this = shift;
 	my $ida = $this->{'__I#D#A__'};
@@ -565,7 +743,7 @@ sub register_loop {
 	if( ! $_[0] || ! $object || ! $pab || ref( $pab ) !~ /PAB/ ) {
 		&Carp::croak( 'Usage: register_loop( $loopid [, $objectname [, $clspab]] )' );
 	}
-	$pab->register_loop( $_[0], 'next', PAB3::PAB_FUNC, undef, undef, $object )
+	$pab->register_loop( $_[0], 'next', PAB3::FUNC, undef, undef, $object )
 		or return $this->_set_error( $pab->error() );
 	return 1;
 }
@@ -581,8 +759,7 @@ sub register_loop_enum {
 			'Usage: register_loop_enum( $loopid [ $recordname [, $objectname [, $clspab]]] )'
 		);
 	}
-	my $record = $_[1] || $pab->[$PAB3::PAB_DEFRECNAME];
-	$pab->register_loop( $_[0], '_enum', PAB3::PAB_FUNC, $record, PAB3::PAB_SCALAR, $object )
+	$pab->register_loop( $_[0], '_enum', PAB3::FUNC, $_[1], PAB3::SCALAR, $object )
 		or return $this->_set_error( $pab->error() );
 	return 1;
 }
@@ -598,10 +775,9 @@ sub register_loop_mapped {
 			'Usage: register_loop_mapped( $loopid [, $record_name [, $objectname [, $clspab]]] )'
 		);
 	}
-	my $record = $_[1] || $pab->[$PAB3::PAB_DEFRECNAME];
-	$pab->register_loop( $_[0], '_enum_mapped', PAB3::PAB_FUNC, $record, PAB3::PAB_SCALAR, $object )
+	$pab->register_loop( $_[0], '_enum_mapped', PAB3::FUNC, $_[1], PAB3::SCALAR, $object )
 		or return $this->_set_error( $pab->error() );
-	$pab->add_hashmap( $_[0], $record, $ida->[$IDA_NAMES] )
+	$pab->add_hashmap( $_[0], $_[1], $ida->[$IDA_NAMES] )
 		or return $this->_set_error( $pab->error() );
 	return 1;
 }
@@ -752,6 +928,7 @@ sub _set_error {
 	my $this = shift;
 	my $ida = $this->{'__I#D#A__'};
 	$ida->[$IDA_ERROR] = $_[0];
+	&Carp::croak( $_[0] );
 	return 0;
 }
 
@@ -896,8 +1073,8 @@ sub _do_update {
 
 sub _do_insert {
 	my $this = shift;
-	my( $db, $sql, $ida, $num_fields, $field, $key, $i, $autofield, $sfields,
-		@key, @insert, @save, $hr
+	my( $db, $sql, $ida, $num_fields, $field, $key, $i, @ainc, $sfields,
+		@key, @insert, @mark, $hr, $stmt
 	);
 	$ida = $this->{'__I#D#A__'};
 	$db = $ida->[$IDA_DB];
@@ -907,40 +1084,35 @@ sub _do_insert {
 		$field = $ida->[$IDA_TABLE_INFO][$i];
 		$key = $field->[$PAB3::DB::DB_FIELD_NAME];
 		if( $field->[$PAB3::DB::DB_FIELD_IDENTITY] && ! $this->{$key} ) {
-			$autofield = $key;
+			push @ainc, $key;
 			next;
 		}
 		push @key, $db->quote_id( $key );
+		push @mark, '?';
 		if( ! defined $this->{$key} ) {
 			if( $field->[$PAB3::DB::DB_FIELD_NULLABLE] ) {
-				push @insert, 'NULL';
-				push @save, undef;
+				push @insert, undef;
 			}
 			else {
-				push @insert, $db->quote( $field->[$PAB3::DB::DB_FIELD_DEFAULT] );
-				push @save, $field->[$PAB3::DB::DB_FIELD_DEFAULT];
+				push @insert, $field->[$PAB3::DB::DB_FIELD_DEFAULT];
 			}
 		}
 		else {
-			push @insert, $db->quote( $this->{$key} );
-			push @save, $this->{$key};
-			$sfields->{$key} = $this->{$key};
+			push @insert, $this->{$key};
 		}
+		$sfields->{$key} = $this->{$key};
 	}
 	$sql =
 		'INSERT INTO ' .
 		$ida->[$IDA_CMD_TEXT] .
 		' ( ' . join( ', ', @key ) . ' ) ' .
-		'VALUES( ' . join( ', ', @insert ) . ' )';
-	$db->query( $sql ) or return 0;
-	for $i( 0 .. $num_fields - 1 ) {
-		$sfields->{ $ida->[$IDA_NAMES][$i] } = $save[$i];
-	}
-	if( $autofield ) {
-		$i = $db->insert_id( $autofield );
+		'VALUES( ' . join( ', ', @mark ) . ' )';
+	$stmt = $db->prepare( $sql ) or return 0;
+	$stmt->execute( @insert ) or return 0;
+	foreach( @ainc ) {
+		$i = $db->insert_id( $_, $ida->[$IDA_CMD_TEXT_PLAIN] );
 		if( defined $i && $i > 0 ) {
-			$this->{ $autofield } = $i;
-			$sfields->{ $autofield } = $i;
+			$this->{$_} = $sfields->{$_} = $i;
 		}
 	}
 	$ida->[$IDA_OFFSET] = $ida->[$IDA_ROWMAX] - $ida->[$IDA_LIMIT];
@@ -1023,9 +1195,12 @@ sub _prepare_query {
 		$sql2 = '';
 	}
 	elsif( $ida->[$IDA_CMD_TYPE] == ctTable ) {
-		$sql = 'SELECT * FROM ' . $db->quote_id( $ida->[$IDA_CMD_TEXT] );
+		$sql = 'SELECT * FROM ' . $db->quote_id( $ida->[$IDA_CMD_TEXT] ) . ' WHERE 1';
 		if( $ida->[$IDA_FILTER] ) {
-			$sql .= ' WHERE ' . $ida->[$IDA_FILTER];
+			$sql .= ' AND ( ' . $ida->[$IDA_FILTER] . ' )';
+		}
+		if( $ida->[$IDA_SEARCH] ) {
+			$sql .= ' AND ( ' . $ida->[$IDA_SEARCH] . ' )';
 		}
 		if( ( $ida->[$IDA_OPTIONS] & $IDA_OPT_CALCROWS ) != 0 ) {
 			$sql2 = $db->sql_calc_rows( $sql );

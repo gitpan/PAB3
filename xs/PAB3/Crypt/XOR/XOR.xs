@@ -121,7 +121,7 @@ PREINIT:
 CODE:
 	pass = SvPVx( _pass, plen );
 	ibuf = SvPVx( _ibuf, ilen );
-	New( 1, obuf, ilen / 2 + 1, char );
+	New( 1, obuf, ilen / 2 + ( ilen % 2 ) + 1, char );
 	p1 = obuf;
 	seed = pass[0];
 	for( i = 1; i < plen; i ++ ) seed = seed ^ pass[i];
@@ -134,7 +134,7 @@ CODE:
 			seed = ( pass[p] ^ seed );
 		}
 		rval = ( pass[p] ^ seed );
-		ch = ibuf[i-1];
+		ch = ibuf[i - 1];
 		val = CHARFROMHEX( ch ) << 4;
 		ch = ibuf[i];
 		*p1 ++ = ( ( val + CHARFROMHEX( ch ) ) ^ rval );

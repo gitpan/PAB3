@@ -158,7 +158,7 @@ sub query {
 		$retval = &{"$${pkg}::query"}( $this->[$DB_LINKID], $_[1] );
 	}
 	if( ! $retval ) {
-		return $this->_set_db_error();
+		return &_set_db_error( $this );
 	}
 	return 1 if $retval == 1;
 	my $res = $this->_create_item( 'PAB3::DB::RES_' );
@@ -191,7 +191,7 @@ sub prepare {
 		$stmtid = &{"$${pkg}::prepare"}( $this->[$DB_LINKID], $_[1] );
 	}
 	if( ! $stmtid ) {
-		return $this->_set_db_error();
+		return &_set_db_error( $this );
 	}
 	my $stmt = $this->_create_item( 'PAB3::DB::STMT_' );
 	$stmt->[$DB_QUERYID] = $stmtid;
@@ -452,8 +452,12 @@ sub _set_db_error {
 		$this->[$DB_ERRNO] = &{"$${pkg}::errno"}( $this->[$DB_LINKID] );
 	}
 	if( $this->[$DB_ERROR] ) {
-		&Carp::croak( $this->[$DB_ERRNO] . ' ' . $this->[$DB_ERROR] ) if $this->[$DB_DIE];
-		&Carp::carp( $this->[$DB_ERRNO] . ' ' . $this->[$DB_ERROR] ) if $this->[$DB_WARN];
+		&Carp::croak(
+			'(Code ' . $this->[$DB_ERRNO] . ') ' . $this->[$DB_ERROR] )
+				if $this->[$DB_DIE];
+		&Carp::carp(
+			'(Code ' . $this->[$DB_ERRNO] . ') ' . $this->[$DB_ERROR] )
+				if $this->[$DB_WARN];
 	}
 	return $_[1];
 }
@@ -492,7 +496,7 @@ package PAB3::DB::STMT_;
 
 BEGIN {
 	our @ISA = qw(PAB3::DB::RES_);
-	*_set_db_error = \&PAB3::DB::error;
+	#*_set_db_error = \&PAB3::DB::_set_db_error;
 }
 
 1;
@@ -512,9 +516,10 @@ sub bind_param {
 sub execute {
 	my $this = shift;
 	my $pkg = $this->[$DB_PKG];
+	#print "params: ", $this->[$DB_QUERYID], '|', join( '|', @_ ), "\n";
 	my $resid = &{"$${pkg}::execute"}( $this->[$DB_QUERYID], @_ );
 	if( ! $resid ) {
-		return $this->_set_db_error();
+		return &_set_db_error( $this );
 	}
 	return $this if $resid == $this->[$DB_QUERYID];
 	my $res = &PAB3::DB::_create_item( $this, 'PAB3::DB::RES_' );
@@ -532,6 +537,28 @@ sub affected_rows {
 	my $this = shift;
 	my $pkg = $this->[$DB_PKG];
 	return &{"$${pkg}::affected_rows"}( $this->[$DB_QUERYID] );
+}
+
+sub _set_db_error {
+	my $this = shift;
+	my $pkg = $this->[$DB_PKG];
+	if( $_[0] ) {
+		$this->[$DB_ERROR] = $_[0];
+		$this->[$DB_ERRNO] = -1;
+	}
+	else {
+		$this->[$DB_ERROR] = &{"$${pkg}::error"}( $this->[$DB_LINKID] );
+		$this->[$DB_ERRNO] = &{"$${pkg}::errno"}( $this->[$DB_LINKID] );
+	}
+	if( $this->[$DB_ERROR] ) {
+		&Carp::croak(
+			'(Code ' . $this->[$DB_ERRNO] . ') ' . $this->[$DB_ERROR] )
+				if $this->[$DB_DIE];
+		&Carp::carp(
+			'(Code ' . $this->[$DB_ERRNO] . ') ' . $this->[$DB_ERROR] )
+				if $this->[$DB_WARN];
+	}
+	return $_[1];
 }
 
 

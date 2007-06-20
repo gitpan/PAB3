@@ -22,7 +22,7 @@ use constant {
 };
 
 BEGIN {
-	$VERSION = '3.1.0';
+	$VERSION = '3.1.1';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	if( ! $PAB3::CGI::VERSION ) {
@@ -474,18 +474,16 @@ PAB3 - Perl Application Builder / Version 3
 =head1 DESCRIPTION
 
 C<PAB3> provides a framework for building rapid applications in Perl5.
-It also includes a template handler for producing output. This part
+It includes a template handler for producing output. This part
 is defined here.
 
 =head2 Examples
 
 Following example loads a template from B<template1.tpx>, does a loop
-over the %ENV variable and prints the output on STDOUT.
+over the %ENV variable and prints the output to STDOUT.
 
-  -------------------------------------------------------------------
-  test1.pl
-  -------------------------------------------------------------------
-  
+- perl script -
+
   #!/usr/bin/perl -w
   
   use PAB3;
@@ -494,15 +492,13 @@ over the %ENV variable and prints the output on STDOUT.
   
   $pab->make_script_and_run( 'template1.tpx' );
 
-  -------------------------------------------------------------------
-  template1.tpx
-  -------------------------------------------------------------------
-  
+- B<template1.tpx> -
+
   main script:
   
   <*= $0 *>
   
-  environment:
+  show the environment:
   
   <* LOOP HASH %ENV *>
   <* PRINT "[$_] => " . $ENV{$_} . "\n" *>
@@ -529,7 +525,7 @@ over the %ENV variable and prints the output on STDOUT.
 
 Set some useful variables to the interpreters environment 
 
-the variables are:
+these variables are:
 
   $ENV{'SCRIPT_PATH'}   : path to the main script
   $ENV{'SCRIPT'}        : name of the main script
@@ -1170,9 +1166,14 @@ B<Example of unregistered loops>
   
   $pab = PAB3->new( ... );
   
-  @data = (
-      [ 'Smith', 'John', 33 ],
-      [ 'Thomson', 'Peggy', 45 ],
+  @h_data = (
+      { 'Name' => 'Smith',    'Prename' => 'John',   'Age' => 33 },
+      { 'Name' => 'Thomson',  'Prename' => 'Peggy',  'Age' => 45 },
+      { 'Name' => 'Johanson', 'Prename' => 'Gustav', 'Age' => 27 },
+  );
+  @a_data = (
+      [ 'Smith',    'John',   33 ],
+      [ 'Thomson',  'Peggy',  45 ],
       [ 'Johanson', 'Gustav', 27 ],
   );
   @fields = ( 'Name', 'Prename', 'Age' );
@@ -1184,17 +1185,17 @@ B<Example of unregistered loops>
 --- template ---
 
   # without id
-  <* LOOP foreach $per( @data ) *>
+  <* LOOP foreach $per( @h_data ) *>
   <* = $per->{'Prename'} . ' ' . $per->{'Name'} *> is <* = $per->{'Age'} *> years old
   <* END LOOP *>
   
   # with id
-  <* LOOP Person foreach $per( @data ) *>
+  <* LOOP Person foreach $per( @h_data ) *>
   <* = $per->{'Prename'} . ' ' . $per->{'Name'} *> is <* = $per->{'Age'} *> years old
   <* END LOOP Person *>
   
   # with hashmap
-  <* LOOP PersonMapped foreach $per (@data) *>
+  <* LOOP PersonMapped foreach $per (@a_data) *>
   <* = $per->{'Prename'} . ' ' . $per->{'Name'} *> is <* = $per->{'Age'} *> years old
   <* END LOOP *>
 

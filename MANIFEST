@@ -34,6 +34,7 @@ xs/PAB3/DB/Driver/Mysql/Mysql.pm
 xs/PAB3/DB/Driver/Mysql/Mysql.xs
 xs/PAB3/DB/Driver/Mysql/my_mysql.c
 xs/PAB3/DB/Driver/Mysql/my_mysql.h
+xs/PAB3/DB/Driver/Mysql/Changes
 xs/PAB3/DB/Driver/Mysql/MANIFEST
 xs/PAB3/DB/Driver/Mysql/README
 xs/PAB3/DB/Driver/Mysql/t/00_mysql_basic.t
@@ -43,6 +44,7 @@ xs/PAB3/DB/Driver/Postgres/Postgres.pm
 xs/PAB3/DB/Driver/Postgres/Postgres.xs
 xs/PAB3/DB/Driver/Postgres/my_postgres.c
 xs/PAB3/DB/Driver/Postgres/my_postgres.h
+xs/PAB3/DB/Driver/Postgres/Changes
 xs/PAB3/DB/Driver/Postgres/MANIFEST
 xs/PAB3/DB/Driver/Postgres/README
 xs/PAB3/DB/Driver/Postgres/t/00_postgres_basic.t
@@ -52,6 +54,7 @@ xs/PAB3/DB/Driver/Sqlite3/Sqlite3.pm
 xs/PAB3/DB/Driver/Sqlite3/Sqlite3.xs
 xs/PAB3/DB/Driver/Sqlite3/my_sqlite3.c
 xs/PAB3/DB/Driver/Sqlite3/my_sqlite3.h
+xs/PAB3/DB/Driver/Sqlite3/Changes
 xs/PAB3/DB/Driver/Sqlite3/MANIFEST
 xs/PAB3/DB/Driver/Sqlite3/README
 xs/PAB3/DB/Driver/Sqlite3/t/00_sqlite3_basic.t

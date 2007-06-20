@@ -86,7 +86,7 @@ sub fetchrow_hashref {
 	$query_id = $query_id->[$DB_QUERYID] if ref( $query_id );
 	$query_id ||= $this->[$DB_QUERYID];
 	$pkg = $this->[$DB_PKG];
-	%row = &{"$${pkg}::fetch_hash"}( $query_id );
+	%row = &{"$${pkg}::fetch_hash"}( $query_id ) or return undef;
 	return \%row;
 }
 
@@ -96,7 +96,7 @@ sub fetchrow_arrayref {
 	$query_id = $query_id->[$DB_QUERYID] if ref( $query_id );
 	$query_id ||= $this->[$DB_QUERYID];
 	$pkg = $this->[$DB_PKG];
-	@row = &{"$${pkg}::fetch_row"}( $query_id );
+	@row = &{"$${pkg}::fetch_row"}( $query_id ) or return undef;
 	return \@row;
 }
 
@@ -114,8 +114,7 @@ sub selectrow_array {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	@row = &{"$${pkg}::fetch_row"}( $res->[$DB_QUERYID] );
-	return @row;
+	return &{"$${pkg}::fetch_row"}( $res->[$DB_QUERYID] );
 }
 
 sub selectrow_arrayref {
@@ -132,8 +131,7 @@ sub selectrow_arrayref {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	@row = &{"$${pkg}::fetch_row"}( $res->[$DB_QUERYID] );
-	return @row ? \@row : undef;
+	return &{"$${pkg}::fetch_row"}( $res->[$DB_QUERYID] );
 }
 
 sub selectrow_hash {
@@ -150,8 +148,7 @@ sub selectrow_hash {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	%row = &{"$${pkg}::fetch_hash"}( $res->[$DB_QUERYID] );
-	return %row;
+	return &{"$${pkg}::fetch_hash"}( $res->[$DB_QUERYID] );
 }
 
 sub selectrow_hashref {
@@ -168,8 +165,8 @@ sub selectrow_hashref {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	%row = &{"$${pkg}::fetch_hash"}( $res->[$DB_QUERYID] );
-	return %row ? \%row : undef;
+	%row = &{"$${pkg}::fetch_hash"}( $res->[$DB_QUERYID] ) or return undef;
+	return \%row;
 }
 
 sub selectall_arrayref {
@@ -218,7 +215,7 @@ sub selectcol_arrayref {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	@col = $res->fetch_col( $res );
+	@col = $res->fetch_col( $res ) or return undef;
 	return \@col;
 }
 

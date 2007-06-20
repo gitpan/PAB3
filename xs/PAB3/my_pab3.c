@@ -128,10 +128,10 @@ const char *my_stristr( const char *str, const char *pattern ) {
 }
 
 
-char *my_strrev( char *str ) {
+char *my_strrev( char *str, size_t len ) {
 	char *p1, *p2;
 	if( ! str || ! *str ) return str;
-	for( p1 = str, p2 = str + strlen( str ) - 1; p2 > p1; ++ p1, -- p2 ) {
+	for( p1 = str, p2 = str + len - 1; p2 > p1; ++ p1, -- p2 ) {
 		*p1 ^= *p2;
 		*p2 ^= *p1;
 		*p1 ^= *p2;
@@ -142,40 +142,45 @@ char *my_strrev( char *str ) {
 char *my_itoa( char *str, int value, int radix ) {
 	int rem;
 	char *ret = str;
-	char ch  = '!';
-	do {
-		rem = value % radix;
-		value /= radix;
-		if( 16 == radix ) {
+	switch( radix ) {
+	case 16:
+		do {
+			rem = value % 16;
+			value /= 16;
 			switch( rem ) {
 			case 10:
-				ch = 'a';
+				*ret ++ = 'A';
 				break;
 			case 11:
-				ch ='b';
+				*ret ++ = 'B';
 				break;
 			case 12:
-				ch = 'c';
+				*ret ++ = 'C';
 				break;
 			case 13:
-				ch ='d';
+				*ret ++ = 'D';
 				break;
 			case 14:
-				ch = 'e';
+				*ret ++ = 'E';
 				break;
 			case 15:
-				ch ='f';
+				*ret ++ = 'F';
+				break;
+			default:
+				*ret ++ = (char) ( rem + 0x30 );
 				break;
 			}
-		}
-		if( '!' == ch )
+		} while( value != 0 );
+		break;
+	default:
+		do {
+			rem = value % radix;
+			value /= radix;
 			*ret ++ = (char) ( rem + 0x30 );
-		else
-			*ret ++ = ch;
-		
-	} while( value != 0 );
-	*ret = '\0';
-	my_strrev( str );
+		} while( value != 0 );
+	}
+	*ret = '\0' ;
+	my_strrev( str, ret - str );
 	return ret;
 }
 
@@ -1165,10 +1170,6 @@ char rtype;
 	char *p1, *p2, *p3, *p4, *pk1, *str = NULL;
 	size_t len = 0, pos = 0, resize, i;
 	int ret;
-	if( rtype == PAB_TYPE_ARRAY || rtype == PAB_TYPE_AUTO ) {
-	}
-	if( rtype == PAB_TYPE_SCALAR || rtype == PAB_TYPE_AUTO ) {
-	}
 	for( pi = parent->child; pi != NULL; pi = pi->next ) {
 		if( pi->content == NULL ) goto mh_next;
 		p1 = pi->content;

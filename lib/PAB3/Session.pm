@@ -187,7 +187,7 @@ sub write {
 		local( $SIG{'__DIE__'}, $SIG{'__WARN__'} );
 		&Storable::store_fd( \%_SESSION, $fd );
 	};
-	flock( $fd, 2 );
+	flock( $fd, 8 );
 	close( $fd );
 	if( $@ ) {
 		&Carp::croak( $@ );

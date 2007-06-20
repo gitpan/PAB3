@@ -1,10 +1,24 @@
 Revision history for Perl extension PAB3.
 
+version 3.1.1
+    - bugfix: internal output buffer in PAB3::Utils::strftime was calulated
+      to small, that the result string may be cut
+    - fixed return values in several functions at PAB3::DB::Max
+    - fixed broken statement error handling in PAB3::DB
+    - fixed broken parameter binding in PAB3::DB::Driver::Prosgres::execute()
+      method
+    - fixed broke statement names in module PAB3::DB::Driver::Prosgres
+    - fixed misplaced code in prepare() and execute() functions in
+      PAB3::DB::Driver::Mysql
+    - fixed PAB3::DB::Driver::Sqlite3::execute() method which returns an
+      error on second and further calls
+
 version 3.1.0
     - template parser rewritten in XS and C
     - predefined loop "FOR" has been removed
     - now loops can be written directly in the template without loosing the
-      control about hashmaps
+      control over hashmaps
     - functions PAB3::make_script and PAB3::run_script are deprecated and has
       been removed
     - PAB3::HashMapCache has been renamed into PAB3::HashmapCache
+    - support for aliases in locale settings
