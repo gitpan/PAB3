@@ -1,5 +1,8 @@
 Revision history for Perl extension PAB3.
 
+version 3.1.2
+    - fixed MY_CXT handling to run with perl5.9.x
+
 version 3.1.1
     - bugfix: internal output buffer in PAB3::Utils::strftime was calulated
       to small, that the result string may be cut

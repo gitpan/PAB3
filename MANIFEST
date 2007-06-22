@@ -15,7 +15,12 @@ lib/PAB3/Output/CGI.pm
 lib/PAB3/Output/Code.pm
 lib/PAB3/Output/Object.pm
 lib/PAB3/Session.pm
-t/00_pab_basic.t
+t/0_pab_00_basic.t
+t/0_pab_01_parser.t
+t/5_utils_00_basic.t
+t/5_utils_01_time.t
+t/5_utils_02_class.t
+t/9_crypt_xor.t
 xs/Makefile.PL
 xs/PAB3/Makefile.PL
 xs/PAB3/my_pab3.c
@@ -72,9 +77,6 @@ xs/PAB3/Utils/locale/en_US
 xs/PAB3/Utils/locale/en_US.UTF-8
 xs/PAB3/Utils/setlocale.PL
 xs/PAB3/Utils/setzoneinfo.PL
-xs/PAB3/Utils/t/00_utils_basic.t
-xs/PAB3/Utils/t/01_utils_time.t
-xs/PAB3/Utils/t/02_utils_class.t
 xs/PAB3/Utils/zoneinfo/Asia/Yekaterinburg.ics
 xs/PAB3/Utils/zoneinfo/Asia/Qyzylorda.ics
 xs/PAB3/Utils/zoneinfo/Asia/Yakutsk.ics

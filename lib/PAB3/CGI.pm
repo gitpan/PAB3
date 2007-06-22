@@ -606,7 +606,7 @@ PAB3::CGI - CGI module for the PAB3 environment or as standalone
   # set some useful variables to the environment
   PAB3::CGI::setenv();
   
-  # parse request and cookies
+  # parse request and cookies and start the cgi output handler
   PAB3::CGI::init();
   
   if( $_REQUEST{'cmd'} eq 'showenv' ) {

@@ -281,7 +281,7 @@ Christian Mueller <christian_at_hbr1.com>
 
 =head1 COPYRIGHT
 
-The PAB3::HashMapCache module is free software. You may distribute under the
+The PAB3::HashmapCache module is free software. You may distribute under the
 terms of either the GNU General Public License or the Artistic License, as
 specified in the Perl README file.
 

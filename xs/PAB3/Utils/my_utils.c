@@ -47,20 +47,16 @@ char *PerlIO_fgets( char *buf, size_t max, PerlIO *stream ) {
 	return tmp;
 }
 
-my_thread_var_t *find_thread_var( unsigned long tid ) {
-	dMY_CXT;
+my_thread_var_t *find_thread_var( my_cxt_t *cxt, UV tid ) {
 	my_thread_var_t *tv1;
-	tv1 = MY_CXT.threads;
-	while( tv1 ) {
+	for( tv1 = cxt->threads; tv1 != NULL; tv1 = tv1->next ) {
 		if( tv1->tid == tid ) return tv1;
-		tv1 = tv1->next;
 	}
-	return 0;
+	return NULL;
 }
 
-my_thread_var_t *create_thread_var( unsigned long tid ) {
+my_thread_var_t *create_thread_var( my_cxt_t *cxt, UV tid ) {
 	my_thread_var_t *tv;
-	dMY_CXT;
 	Newz( 1, tv, 1, my_thread_var_t );
 	if( ! tv ) {
 		/* out of memory! */
@@ -68,26 +64,25 @@ my_thread_var_t *create_thread_var( unsigned long tid ) {
 	}
 	tv->tid = tid;
 	Copy( &DEFAULT_LOCALE, &tv->locale, 1, my_locale_t );
-	if( MY_CXT.threads == NULL )
-		MY_CXT.threads = tv;
+	if( cxt->threads == NULL )
+		cxt->threads = tv;
 	else {
-		MY_CXT.last_thread->next = tv;
-		tv->prev = MY_CXT.last_thread;
+		cxt->last_thread->next = tv;
+		tv->prev = cxt->last_thread;
 	}
-	MY_CXT.last_thread = tv;
+	cxt->last_thread = tv;
 	return tv;
 }
 
-void remove_thread_var( my_thread_var_t *tv ) {
+void remove_thread_var( my_cxt_t *cxt, my_thread_var_t *tv ) {
 	my_thread_var_t *tvp, *tvn;
-	dMY_CXT;
 	if( ! tv ) return;
 	tvp = tv->prev;
 	tvn = tv->next;
-	if( tv == MY_CXT.threads )
-		MY_CXT.threads = tvn;
-	if( tv == MY_CXT.last_thread )
-		MY_CXT.last_thread = tvp;
+	if( tv == cxt->threads )
+		cxt->threads = tvn;
+	if( tv == cxt->last_thread )
+		cxt->last_thread = tvp;
 	if( tvp )
 		tvp->next = tvn;
 	if( tvn )
@@ -95,23 +90,21 @@ void remove_thread_var( my_thread_var_t *tv ) {
 	Safefree( tv );
 }
 
-void cleanup_my_utils() {
+void cleanup_my_utils( my_cxt_t *cxt ) {
 	my_thread_var_t *tv1, *tv2;
-	dMY_CXT;
-	tv1 = MY_CXT.threads;
+	tv1 = cxt->threads;
 	while( tv1 ) {
 		tv2 = tv1->next;
 		Safefree( tv1 );
 		tv1 = tv2;
 	}
-	MY_CXT.threads = MY_CXT.last_thread = NULL;
-	free_locale_alias();
+	cxt->threads = cxt->last_thread = NULL;
+	free_locale_alias( cxt );
 }
 
-void free_locale_alias() {
-	dMY_CXT;
+void free_locale_alias( my_cxt_t *cxt ) {
 	my_locale_alias_t *p1, *p2;
-	p1 = MY_CXT.locale_alias;
+	p1 = cxt->locale_alias;
 	while( p1 ) {
 		p2 = p1->next;
 		Safefree( p1->alias );
@@ -119,17 +112,16 @@ void free_locale_alias() {
 		Safefree( p1 );
 		p1 = p2;
 	}
-	MY_CXT.locale_alias = NULL;
+	cxt->locale_alias = NULL;
 }
 
-void read_locale_alias() {
-	dMY_CXT;
+void read_locale_alias( my_cxt_t *cxt ) {
 	PerlIO *pfile;
 	char str[256], *key, *val, *p1;
 	int lkey, lval;
 	my_locale_alias_t *pl1, *pl2 = NULL;
-	free_locale_alias();
-	key = my_strcpy( str, MY_CXT.locale_path );
+	free_locale_alias( cxt );
+	key = my_strcpy( str, cxt->locale_path );
 	my_strcpy( key, "#alias" );
 	//printf( "read locale alias from %s\n", str );
 	pfile = PerlIO_open( str, "r" );
@@ -161,7 +153,7 @@ void read_locale_alias() {
 		Copy( key, pl1->alias, lkey + 1, char );
 		Copy( val, pl1->locale, lval + 1, char );
 		if( pl2 == NULL )
-			MY_CXT.locale_alias = pl1;
+			cxt->locale_alias = pl1;
 		else
 			pl2->next = pl1;
 		pl2 = pl1;
@@ -169,10 +161,9 @@ void read_locale_alias() {
 	PerlIO_close( pfile );
 }
 
-const char *get_locale_alias( const char *id ) {
-	dMY_CXT;
+const char *get_locale_alias( my_cxt_t *cxt, const char *id ) {
 	my_locale_alias_t *la1;
-	for( la1 = MY_CXT.locale_alias; la1 != NULL; la1 = la1->next ) {
+	for( la1 = cxt->locale_alias; la1 != NULL; la1 = la1->next ) {
 		if( strcmp( la1->alias, id ) == 0 ) {
 			//printf( "found alias %s\n", id );
 			return la1->locale;
@@ -181,14 +172,17 @@ const char *get_locale_alias( const char *id ) {
 	return id;
 }
 
-const char *get_locale_format_settings( const char *id, my_locale_t *locale ) {
-	dMY_CXT;
+const char *get_locale_format_settings( cxt, id, locale )
+	my_cxt_t *cxt;
+	const char *id;
+	my_locale_t *locale;
+{
 	char str[256], *key, *val, *p1;
 	PerlIO *pfile;
 	int i;
 	if( locale == 0 ) return NULL;
-	key = my_strncpy( str, MY_CXT.locale_path, MY_CXT.locale_path_length );
-	id = get_locale_alias( id );
+	key = my_strncpy( str, cxt->locale_path, cxt->locale_path_length );
+	id = get_locale_alias( cxt, id );
 	my_strcpy( key, id );
 	pfile = PerlIO_open( str, "r" );
 	if( ! pfile ) return NULL;
@@ -358,7 +352,13 @@ strtime..
 almost posix compatible
 */
 
-int _int_strftime( my_thread_var_t *tv, char *str, int maxlen, const char *format, my_vdatetime_t *stime ) {
+int _int_strftime( tv, str, maxlen, format, stime )
+	my_thread_var_t *tv;
+	char *str;
+	int maxlen;
+	const char *format;
+	my_vdatetime_t *stime;
+{
 	int i, fml, step, val, l;
 	char *ret, *ml;
 	const char *sval;
@@ -629,9 +629,13 @@ strfmon..
 almost posix compatible
 */
 
-//#define MY_STRFMON_FMT "[%-14#5.0n]"
-
-size_t _int_strfmon( my_thread_var_t *tv, char *str, size_t maxsize, const char *format, ... ) {
+size_t _int_strfmon(
+	my_thread_var_t *tv,
+	char *str,
+	size_t maxsize,
+	const char *format,
+	...
+) {
 	my_locale_t *loc = &tv->locale;
 	int step = 0, grouping = 0, plus = 0, currency = 0, justify, width;
 	int swp = 0, lpp = 0, rpp = 0, lprec, rprec, j, fmt;
@@ -639,11 +643,6 @@ size_t _int_strfmon( my_thread_var_t *tv, char *str, size_t maxsize, const char 
 	char *ret, chf, *ml, fill, swidth[16], slprec[16], srprec[16];
 	char *cptr, *cpt2;
 	double darg;
-	/*
-	char tmp[256];
-	strfmon( tmp, sizeof( tmp ), MY_STRFMON_FMT "\n" MY_STRFMON_FMT "\n" MY_STRFMON_FMT, 123.45, -123.45, 3456.781 );
-	printf( "\n%s\n\n", tmp );
-	*/
 	va_list ap;
 	va_start( ap, format );
 	fml = strlen( format );
@@ -847,8 +846,7 @@ exit:
 	return (size_t) ( ret - str );
 }
 
-int parse_timezone( const char *tz, my_vtimezone_t *vtz ) {
-	dMY_CXT;
+int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz ) {
 	char zfile[256], str[256], *key, *val, *val2, *key2;
 	char *key3, *val3;
 	PerlIO *pfile;
@@ -857,7 +855,7 @@ int parse_timezone( const char *tz, my_vtimezone_t *vtz ) {
 	my_weekdaynum_t *wdn;
 	if( vtz == 0 ) return 0;
 	len = strlen( tz );
-	key = my_strncpy( zfile, MY_CXT.zoneinfo_path, MY_CXT.zoneinfo_path_length );
+	key = my_strncpy( zfile, cxt->zoneinfo_path, cxt->zoneinfo_path_length );
 	key = my_strncpy( key, tz, len );
 	key = my_strncpy( key, ".ics", 4 );
 	pfile = PerlIO_open( zfile, "r" );

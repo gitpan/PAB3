@@ -7,7 +7,7 @@
 
 #define __PACKAGE__ "PAB3"
 
-#define MY_CXT_KEY "PAB3::_guts" XS_VERSION
+#define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
 
 #ifdef _WIN32
 #undef vsnprintf
@@ -159,10 +159,10 @@ char *my_strcpy( char *dst, const char *src );
 char *my_strncpy( char *dst, const char *src, unsigned long len );
 char* my_itoa( char* str, int value, int radix );
 
-my_thread_var_t *my_thread_var_add( SV *sv );
+my_thread_var_t *my_thread_var_add( my_cxt_t *cxt, SV *sv );
 void my_thread_var_free( my_thread_var_t *tv );
-void my_thread_var_rem( my_thread_var_t *tv );
-my_thread_var_t *my_thread_var_find( SV *sv );
+void my_thread_var_rem( my_cxt_t *cxt, my_thread_var_t *tv );
+my_thread_var_t *my_thread_var_find( my_cxt_t *cxt, SV *sv );
 
 int my_set_error( my_thread_var_t *tv, const char *tpl, ... );
 void set_var_str( char *str, size_t *str_len, char type );

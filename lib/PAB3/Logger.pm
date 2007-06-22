@@ -10,6 +10,12 @@ use warnings;
 use Time::HiRes ();
 use Carp ();
 
+use vars qw($VERSION);
+
+BEGIN {
+	$VERSION = '1.0.0';
+}
+
 our @LOG_ITEM = ( 'None', 'Error', 'Warning', 'Info', 'Debug' );
 
 our $LOG_LEVEL		= 0;

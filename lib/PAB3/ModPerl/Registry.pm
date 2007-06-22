@@ -8,7 +8,10 @@ package PAB3::ModPerl::Registry;
 use strict;
 use warnings;
 
+use vars qw($VERSION);
+
 BEGIN {
+	$VERSION = '1.0.0';
 	if( exists $ENV{'MOD_PERL_API_VERSION'}
 		&& $ENV{'MOD_PERL_API_VERSION'} == 2
 	) {

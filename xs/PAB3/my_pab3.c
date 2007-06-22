@@ -233,17 +233,16 @@ char *str_replace( out, lout, str, lstr, search, lsch, replace, lrep )
 	return sz;
 }
 
-my_thread_var_t *my_thread_var_add( SV *sv ) {
-	dMY_CXT;
+my_thread_var_t *my_thread_var_add( my_cxt_t *cxt, SV *sv ) {
 	my_thread_var_t *tv;
 	New( 1, tv, 1, my_thread_var_t );
 	Copy( &THREADVAR_DEFAULT, tv, 1, my_thread_var_t );
 	tv->id = sv;
-	if( MY_CXT.first_thread == NULL )
-		MY_CXT.first_thread = tv;
+	if( cxt->first_thread == NULL )
+		cxt->first_thread = tv;
 	else
-		refbuf_add( MY_CXT.last_thread, tv );
-	MY_CXT.last_thread = tv;
+		refbuf_add( cxt->last_thread, tv );
+	cxt->last_thread = tv;
 	return tv;
 }
 
@@ -269,21 +268,19 @@ void my_thread_var_free( my_thread_var_t *tv ) {
 	Safefree( tv );
 }
 
-void my_thread_var_rem( my_thread_var_t *tv ) {
-	dMY_CXT;
-	if( tv == MY_CXT.last_thread )
-		MY_CXT.last_thread = tv->prev;
-	if( tv == MY_CXT.first_thread )
-		MY_CXT.first_thread = tv->next;
+void my_thread_var_rem( my_cxt_t *cxt, my_thread_var_t *tv ) {
+	if( tv == cxt->last_thread )
+		cxt->last_thread = tv->prev;
+	if( tv == cxt->first_thread )
+		cxt->first_thread = tv->next;
 	refbuf_rem( tv );
 	my_thread_var_free( tv );
 }
 
-my_thread_var_t *my_thread_var_find( SV *sv ) {
-	dMY_CXT;
+my_thread_var_t *my_thread_var_find( my_cxt_t *cxt, SV *sv ) {
 	my_thread_var_t *tv;
 	if( ! SvROK( sv ) || ! ( sv = SvRV( sv ) ) ) return NULL;
-	for( tv = MY_CXT.last_thread; tv != NULL; tv = tv->prev ) {
+	for( tv = cxt->last_thread; tv != NULL; tv = tv->prev ) {
 		if( tv->id == sv ) return tv;
 	}
 	return NULL;

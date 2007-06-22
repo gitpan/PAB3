@@ -6,4 +6,5 @@ Mysql.pm
 Mysql.xs
 my_mysql.c
 my_mysql.h
+install_files.PL
 t/00_mysql_basic.t

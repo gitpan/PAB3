@@ -14,7 +14,7 @@ print '', ( $#lt == 8 ? "ok" : "failed" ), " 2\n";
 
 use Cwd;
 
-$dir = getcwd() . '/';
+$dir = getcwd() . '/blib/arch/auto/PAB3/Utils/';
 if( -f $dir . 'zoneinfo/Europe/Berlin.ics' ) {
 	&PAB3::Utils::_set_module_path( $dir );
 	

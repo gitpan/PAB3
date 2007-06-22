@@ -4,7 +4,6 @@ package PAB3::Output::CGI;
 # Module: PAB3::Output::CGI
 # TIEHANDLE for CGI output
 # =============================================================================
-
 use strict;
 no strict 'refs';
 use warnings;
@@ -81,7 +80,7 @@ sub SENDHEADER {
 		foreach $key( keys %PAB3::CGI::HEAD ) {
 			$needct = 0 if $needct && ( $key eq 'content-type' || 'location' );
 			if( ref( $PAB3::CGI::HEAD{$key} ) ) {
-				foreach $val( @{ $PAB3::CGI::HEAD{$key} } ) {
+				foreach $val( @{$PAB3::CGI::HEAD{$key}} ) {
 					$ret = &HEADER_MODPERL( $key, $val );
 					$needct = $ret if $needct;
 				}
@@ -107,7 +106,7 @@ sub SENDHEADER {
 		foreach $key( keys %PAB3::CGI::HEAD ) {
 			$needct = 0 if $needct && ( $key eq 'content-type' || 'location' );
 			if( ref( $PAB3::CGI::HEAD{$key} ) ) {
-				foreach( @{ $PAB3::CGI::HEAD{$key} } ) {
+				foreach( @{$PAB3::CGI::HEAD{$key}} ) {
 		    		print $key . ': ' . $_ . "\015\012";
 				}
 			}

@@ -39,16 +39,19 @@ OUTPUT:
 # *****************************************************************************/
 
 void
-_set_module_path( path )
-	const char *path;
+_set_module_path( mpath )
+	SV *mpath;
 PREINIT:
 	dMY_CXT;
 	int i;
-	char *s1, *s2;
+	STRLEN len;
+	char *path, *s1, *s2;
 CODE:
+	path = SvPVx( mpath, len );
+	//fprintf( stderr, "set module path [%s]\n", path );
 	s1 = MY_CXT.locale_path;
 	s2 = MY_CXT.zoneinfo_path;
-	for( i = strlen( path ); i > 0; i -- ) {
+	for( i = len; i > 0; i -- ) {
 		*s1 ++ = *path;
 		*s2 ++ = *path;
 		path ++;
@@ -59,7 +62,7 @@ CODE:
 	*( s2 += 9 ) = '\0';
 	MY_CXT.locale_path_length = (int) ( s1 - MY_CXT.locale_path );
 	MY_CXT.zoneinfo_path_length = (int) ( s2 - MY_CXT.zoneinfo_path );
-	read_locale_alias();
+	read_locale_alias( &MY_CXT );
 
 
 #/*****************************************************************************
@@ -123,14 +126,15 @@ const char *
 _set_locale( tid, ... )
 	UV tid;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	int i;
 	const char *str;
 CODE:
-	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	for( i = 1; i < items; i ++ ) {
 		str = (const char *) SvPV_nolen( ST(i) );
-		if( ( str = get_locale_format_settings( str, &tv->locale ) ) ) {
+		if( ( str = get_locale_format_settings( &MY_CXT, str, &tv->locale ) ) ) {
 			RETVAL = str;
 			goto exit;
 		}
@@ -150,6 +154,7 @@ _set_user_locale( tid, hash_ref )
 	UV tid;
 	HV *hash_ref;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	my_locale_t *loc;
 	SV **svp;
@@ -157,7 +162,7 @@ PREINIT:
 	AV *av;
 	int i;
 CODE:
-	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	loc = &tv->locale;
 	if( ( svp = hv_fetch( hash_ref, "grp", 3, 0 ) ) != 0
 		|| ( svp = hv_fetch( hash_ref, "grouping", 8, 0 ) ) != 0
@@ -342,32 +347,31 @@ _number_format( tid, value, dec = 0, pnt = 0, thou = 0, neg = 0, pos = 0, zerofi
 	int zerofill;
 	char fillchar;
 PREINIT:
+	dMY_CXT;
 	char thousep;
 	char pos2;
 	my_thread_var_t *tv;
 	char str[256];
 CODE:
-	{
-		if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
-		if( pnt == 0 ) pnt = tv->locale.decimal_point;
-		if( thou == 0 || ! SvOK( thou ) )
-			thousep = tv->locale.thousands_sep;
-		else if( SvPOK( thou ) )
-			thousep = (char)* SvPV_nolen( thou );
-		else
-			thousep = 0;
-		if( neg == 0 ) neg = tv->locale.negative_sign;
-		if( pos == 0 || ! SvOK( pos ) )
-			pos2 = 0;
-		else if( SvPOK( pos ) )
-			pos2 = (char)* SvPV_nolen( pos );
-		else
-			pos2 = tv->locale.positive_sign;
-		_int_number_format(
-			value, str, 255, dec, pnt, thousep, neg, pos2, zerofill, fillchar
-		);
-		ST(0) = sv_2mortal( newSVpv( str, 0 ) );
-	}
+	find_or_create_tv( &MY_CXT, tv, tid );
+	if( pnt == 0 ) pnt = tv->locale.decimal_point;
+	if( thou == 0 || ! SvOK( thou ) )
+		thousep = tv->locale.thousands_sep;
+	else if( SvPOK( thou ) )
+		thousep = (char)* SvPV_nolen( thou );
+	else
+		thousep = 0;
+	if( neg == 0 ) neg = tv->locale.negative_sign;
+	if( pos == 0 || ! SvOK( pos ) )
+		pos2 = 0;
+	else if( SvPOK( pos ) )
+		pos2 = (char)* SvPV_nolen( pos );
+	else
+		pos2 = tv->locale.positive_sign;
+	_int_number_format(
+		value, str, 255, dec, pnt, thousep, neg, pos2, zerofill, fillchar
+	);
+	ST(0) = sv_2mortal( newSVpv( str, 0 ) );
 
 
 #/*****************************************************************************
@@ -379,15 +383,16 @@ _set_timezone( tid, tz )
 	UV tid;
 	const char *tz;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 CODE:
-	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	if(
 		! tv->timezone.id[0]
 		|| strcmp( tv->timezone.id, tz ) != 0
 	) {
 		Zero( &tv->timezone, 1, my_vtimezone_t );
-		RETVAL = read_timezone( tz, &tv->timezone );
+		RETVAL = read_timezone( &MY_CXT, tz, &tv->timezone );
 	}
 	else {
 		RETVAL = 1;
@@ -404,11 +409,12 @@ void
 _localtime( tid, ... )
 	UV tid;
 PREINIT:
+	dMY_CXT;
 	time_t timer;
 	my_vdatetime_t *tim;
 	my_thread_var_t *tv;
 PPCODE:
-	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	if( items < 2 )
 		timer = time( 0 );
 	else
@@ -461,13 +467,14 @@ char *
 _strftime( tid, format, ... )
 	UV tid;
 	const char *format;
-INIT:
+PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	long len, gmt;
 	my_vdatetime_t *tim;
 	time_t timestamp;
 CODE:
-	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	len = strlen( format );
 	if( ! len ) {
 		RETVAL = NULL;
@@ -509,9 +516,10 @@ _strfmon( tid, format, number )
 	const char *format;
 	double number;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 CODE:
-	if( ! ( tv = find_thread_var( tid ) ) ) tv = create_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	New( 1, RETVAL, 64, char );
 	_int_strfmon( tv, RETVAL, 64, format, number );
 OUTPUT:
@@ -528,11 +536,12 @@ void
 _cleanup_class( tid )
 	UV tid;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 CODE:
-	tv = find_thread_var( tid );
+	find_or_create_tv( &MY_CXT, tv, tid );
 	if( tv )
-		remove_thread_var( tv );
+		remove_thread_var( &MY_CXT, tv );
 
 
 #/*****************************************************************************
@@ -541,5 +550,7 @@ CODE:
 
 void
 _cleanup()
+PREINIT:
+	dMY_CXT;
 CODE:
-	cleanup_my_utils();
+	cleanup_my_utils( &MY_CXT );

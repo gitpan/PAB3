@@ -23,6 +23,7 @@ void
 _new( class, ... )
 	SV *class;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	SV *sv;
 	HV *hv;
@@ -31,8 +32,7 @@ PREINIT:
 	char *key, *val;
 PPCODE:
 	sv = sv_2mortal( (SV*) newHV() );
-	tv = my_thread_var_add( sv );
-	//printf( "tv: 0x%06X\n", tv );
+	tv = my_thread_var_add( &MY_CXT, sv );
 	for( itemp = 1; itemp < items - 1; itemp += 2 ) {
 		if( ! SvPOK( ST(itemp) ) ) continue;
 		key = SvPVx( ST(itemp), lkey );
@@ -105,9 +105,10 @@ void
 reset( this )
 	SV *this;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 PPCODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) return;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) return;
 	my_parser_session_cleanup( tv );
 	my_loop_def_cleanup( tv );
 	my_hashmap_cleanup( tv );
@@ -122,11 +123,12 @@ _parse_template( this, template )
 	SV *this;
 	SV *template;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	STRLEN ltmp;
 	char *tmp;
 CODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) goto error;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto error;
 	tv->last_error[0] = '\0';
 	tmp = SvPVx( template, ltmp );
 	if( ! parse_template( tv, tmp, ltmp, 1 ) ) goto error;
@@ -153,13 +155,14 @@ _make_script( this, template, cache )
 	SV *template;
 	SV *cache;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	STRLEN ltmp, ltpl;
 	char *tmp, *p1;
 	char tpl[256], cac[256];
 	//PerlIO *pfile;
 PPCODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) goto ferror;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto ferror;
 	tv->last_error[0] = '\0';
 	tmp = SvPVx( template, ltpl );
 	if( ltpl + tv->path_template_length < 256 ) {
@@ -235,12 +238,13 @@ register_loop( this, loopid, source, stype, record = NULL, rtype = 0, object = N
 	SV *arg;
 	int fixed;
 PREINIT:
+	dMY_CXT;
 	STRLEN len1;
 	const char *str1;
 	my_thread_var_t *tv;
 	my_loop_def_t *ld;
 CODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) goto error;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto error;
 	str1 = SvPVx( loopid, len1 );
 	ld = my_loop_def_find_by_id( tv, str1 );
 	if( ld != NULL ) {
@@ -346,6 +350,7 @@ _add_hashmap( this, loopid, record, fieldmap )
 	SV *record;
 	SV *fieldmap;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 	HV *hv;
 	AV *av;
@@ -357,7 +362,7 @@ PREINIT:
 	HE *he;
 	I32 l2;
 CODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) goto error;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto error;
 	hd = my_hashmap_add( tv );
 	if( SvOK( loopid ) && SvPOK( loopid ) ) {
 		s1 = SvPVx( loopid, l1 );
@@ -427,9 +432,10 @@ void
 error( this )
 	SV *this;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 PPCODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) goto error;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto error;
 	if( tv->last_error[0] != '\0' ) {
 		XPUSHs( sv_2mortal( newSVpvn( tv->last_error, strlen( tv->last_error ) ) ) );
 	}
@@ -449,9 +455,10 @@ set_error( this, msg )
 	SV *this;
 	const char *msg;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 PPCODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) return;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) return;
 	my_strncpy( tv->last_error, msg, sizeof( tv->last_error ) );
 
 
@@ -463,11 +470,12 @@ void
 DESTROY( this )
 	SV *this;
 PREINIT:
+	dMY_CXT;
 	my_thread_var_t *tv;
 PPCODE:
-	if( ( tv = my_thread_var_find( this ) ) == NULL ) return;
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) return;
 	_debug( __PACKAGE__ " destroying tv: 0x%08X\n", tv );
-	my_thread_var_rem( tv );
+	my_thread_var_rem( &MY_CXT, tv );
 
 
 #/*****************************************************************************

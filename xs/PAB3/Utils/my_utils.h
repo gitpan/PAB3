@@ -5,7 +5,7 @@
 #include <perl.h>
 #include <XSUB.h>
 
-//#include <monetary.h>
+#define __PACKAGE__ "PAB3::Utils"
 
 #ifndef DWORD
 #define DWORD unsigned long
@@ -93,7 +93,7 @@ typedef struct st_my_thread_var {
 	my_vdatetime_t				time_struct;
 } my_thread_var_t;
 
-#define MY_CXT_KEY "PAB3::Utils::_guts" XS_VERSION
+#define MY_CXT_KEY __PACKAGE__ "::_guts" XS_VERSION
 
 typedef struct st_my_cxt {
 	char						locale_path[256]; 
@@ -154,18 +154,22 @@ char *my_strncpy( char *dst, const char *src, unsigned long len );
 char *my_strcpy( char *dst, const char *src );
 char *my_itoa( char* str, int value, int radix );
 
-my_thread_var_t *find_thread_var( unsigned long tid );
-my_thread_var_t *create_thread_var( unsigned long tid );
-void remove_thread_var( my_thread_var_t *tv );
-void cleanup_my_utils();
+#define find_or_create_tv(cxt,tv,tid) \
+	if( ! ( (tv) = find_thread_var( (cxt), (tid) ) ) ) \
+		(tv) = create_thread_var( (cxt), (tid) )
+
+my_thread_var_t *find_thread_var( my_cxt_t *cxt, UV tid );
+my_thread_var_t *create_thread_var( my_cxt_t *cxt, UV tid );
+void remove_thread_var( my_cxt_t *cxt, my_thread_var_t *tv );
+void cleanup_my_utils( my_cxt_t *cxt );
 
 void copy_tm_to_vdatetime( struct tm *src, my_vdatetime_t *dst );
-void free_locale_alias();
-void read_locale_alias();
-const char *get_locale_format_settings( const char *id, my_locale_t *locale );
+void free_locale_alias( my_cxt_t *cxt );
+void read_locale_alias( my_cxt_t *cxt );
+const char *get_locale_format_settings( my_cxt_t *cxt, const char *id, my_locale_t *locale );
 int _int_strftime( my_thread_var_t *tv, char *str, int maxlen, const char *format, my_vdatetime_t *stime );
 size_t _int_strfmon( my_thread_var_t *tv, char *str, size_t maxsize, const char *format, ... );
-int parse_timezone( const char *tz, my_vtimezone_t *vtz );
+int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz );
 #define read_timezone parse_timezone
 my_vdatetime_t *apply_timezone( my_thread_var_t *tv, time_t *timer );
 char *_int_number_format( double value, char *str, int maxlen, int fd, char dp, char ts, char ns, char ps, int zf, char fc );
