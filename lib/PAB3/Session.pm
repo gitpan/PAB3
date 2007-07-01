@@ -19,8 +19,9 @@ BEGIN {
 		$GLOBAL::MODPERL = 0;
 		$GLOBAL::MODPERL = 2 if exists $ENV{'MOD_PERL_API_VERSION'}
 			&& $ENV{'MOD_PERL_API_VERSION'} == 2;
-		$GLOBAL::MODPERL = 1 if ! $GLOBAL::MODPERL && defined $modperl::VERSION
-			&& $modperl::VERSION > 1 && $modperl::VERSION < 1.99;
+		$GLOBAL::MODPERL = 1 ! if $GLOBAL::MODPERL
+			&& defined $Apache::VERSION
+			&& $Apache::VERSION > 1 && $Apache::VERSION < 1.99;
 	}
 	if( $GLOBAL::MODPERL == 2 ) {
 		require mod_perl2;
@@ -101,12 +102,12 @@ sub start {
 		$Config{ $_[ $index ] } = $_[ $index + 1 ];
 	}
 	if( $GLOBAL::MODPERL == 2 ) {
-    	my $r = Apache2::RequestUtil->request;
-    	$r->pool->cleanup_register( \&cleanup );
+		my $r = Apache2::RequestUtil->request;
+		$r->pool->cleanup_register( \&cleanup );
     }
-    elsif( $GLOBAL::MODPERL == 1 ) {
-    	my $r = Apache->request;
-    	$r->register_cleanup( \&cleanup );
+	elsif( $GLOBAL::MODPERL == 1 ) {
+		my $r = Apache->request;
+		$r->register_cleanup( \&cleanup );
 	}
 	elsif( $PAB3::CGI::VERSION ) {
 		&PAB3::CGI::cleanup_register( \&cleanup );

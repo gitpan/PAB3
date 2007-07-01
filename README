@@ -1,5 +1,5 @@
-PAB3 version 3.1.1
-==================
+PAB3 - Perl Application Builder v3
+==================================
 
 PAB3 contains a framework for building rapid applications. It uses
 templates to produce output. The templates are translated into

@@ -36,7 +36,7 @@ sub _create_param {
 }
 
 sub _parse_request {
-	my( $len, $type, $meth, $got, $input, $post, $jmp );
+	my( $len, $meth, $got, $input, $post, $jmp );
 	
 	%_GET = ();
 	%_POST = ();
@@ -47,7 +47,6 @@ sub _parse_request {
 	binmode( STDOUT );
 	binmode( STDERR );
 
-	$type = $ENV{'CONTENT_TYPE'};
 	$len  = $ENV{'CONTENT_LENGTH'};
 	$meth = $ENV{'REQUEST_METHOD'};
 	

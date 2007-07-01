@@ -11,7 +11,7 @@ use warnings;
 use vars qw($VERSION);
 
 BEGIN {
-	$VERSION = '1.0.0';
+	$VERSION = '1.0.1';
 	if( exists $ENV{'MOD_PERL_API_VERSION'}
 		&& $ENV{'MOD_PERL_API_VERSION'} == 2
 	) {
@@ -45,6 +45,12 @@ sub handler : method {
     my $class = ( @_ >= 2 ) ? shift : __PACKAGE__;
     my $r = shift;
 
+	if( ! $PAB3::Statistic::VERSION &&
+		$r->dir_config->get( 'UseStatistic' )
+	) {
+		require PAB3::Statistic;
+	}
+
 	# set additional variables to the environment
 	&PAB3::CGI::setenv();
 	
@@ -72,6 +78,10 @@ sub handler : method {
 *{'$package\::setcookie'} = \\\&{'PAB3::CGI::setcookie'};
 *{'$package\::print_var'} = \\\&{'PAB3::CGI::print_var'};
 *{'$package\::print_r'} = \\\&{'PAB3::CGI::print_var'};
+*{'$package\::encode_uri'} = \\\&{'PAB3::CGI::encode_uri'};
+*{'$package\::decode_uri'} = \\\&{'PAB3::CGI::decode_uri'};
+*{'$package\::encode_uri_component'} = \\\&{'PAB3::CGI::encode_uri_component'};
+*{'$package\::encode_uri_component'} = \\\&{'PAB3::CGI::encode_uri_component'};
 EOT1
 
 	if( -r $filename ) {

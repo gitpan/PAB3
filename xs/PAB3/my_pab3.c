@@ -518,7 +518,10 @@ void optimize_script( my_thread_var_t *tv, my_parser_item_t *parent ) {
 	my_parser_item_t *pi, *pf = NULL, *pi1, *pi2;
 	char *buf1 = NULL, *buf2 = NULL, *p1, *p2, *str = NULL, sc = 0;
 	size_t lbuf1 = 0, lbuf2 = 0, found = 0, size, str_len = 0, str_pos = 0;
+
+	_debug( "optimize_script parent 0x%08x\n", parent );
 	for( pi = parent->child; pi != NULL; pi = pi->next ) {
+		_debug( "item type %d\n", pi->id );
 		switch( pi->id ) {
 		case PARSER_ITEM_TEXT:
 			p1 = str_replace( &buf1, &lbuf1, pi->content, pi->content_length,
@@ -546,9 +549,10 @@ void optimize_script( my_thread_var_t *tv, my_parser_item_t *parent ) {
 			p2 = pi->content;
 			size = pi->content_length;
 item_print:
+			_debug( "optimize_script item 0x%08x parent 0x%08x\n", pi, parent );
 			found ++;
 			if( str_pos + size + 20 > str_len ) {
-				str_len = str_pos + size + 20;
+				str_len = str_pos + size + 256;
 				Renew( str, str_len, char );
 			}
 			if( pf == NULL ) pf = pi;
@@ -613,14 +617,13 @@ item_print:
 			break;
 		default:
 			if( found > 1 ) {
+				str[str_pos] = '\0';
 				pf->id = PARSER_ITEM_PRINT;
-				pf->content_length = str_pos - 1;
-				Renew( pf->content, str_pos, char );
-				Copy( str, pf->content, str_pos, char );
-				pf->content[str_pos] = '\0';
-				//_debug( "found: [%s]\n", pf->content );
+				pf->content_length = str_pos;
+				Renew( pf->content, str_pos + 1, char );
+				Copy( str, pf->content, str_pos + 1, char );
+				//_debug( "found: (%u) [%s]\n[%s]\n", strlen(str), str, pf->content );
 				pi1 = pf->next;
-				pf->next = pi;
 				while( pi1 != pi ) {
 					pi2 = pi1->next;
 					Safefree( pi1->content );
@@ -629,6 +632,7 @@ item_print:
 					Safefree( pi1 );
 					pi1 = pi2;
 				}
+				pf->next = pi;
 			}
 			found = 0;
 			str_pos = 0;
@@ -639,14 +643,13 @@ item_print:
 		}
 	}
 	if( found > 1 ) {
+		str[str_pos] = '\0';
 		pf->id = PARSER_ITEM_PRINT;
-		pf->content_length = str_pos - 1;
-		Renew( pf->content, str_pos, char );
-		Copy( str, pf->content, str_pos, char );
-		pf->content[str_pos] = '\0';
-		//_debug( "found: [%s]\n", pf->content );
+		pf->content_length = str_pos;
+		Renew( pf->content, str_pos + 1, char );
+		Copy( str, pf->content, str_pos + 1, char );
+		//_debug( "found: (%u) [%s]\n[%s]\n", strlen(str), str, pf->content );
 		pi1 = pf->next;
-		pf->next = NULL;
 		while( pi1 != NULL ) {
 			pi2 = pi1->next;
 			Safefree( pi1->content );
@@ -655,6 +658,7 @@ item_print:
 			Safefree( pi1 );
 			pi1 = pi2;
 		}
+		pf->next = NULL;
 	}
 	Safefree( buf1 );
 	Safefree( buf2 );
@@ -1340,7 +1344,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 		Copy( p1, item->content, item->content_length + 1, char );
 		item->parent = tv->parser.last_parent;
 		ADD_ITEM( tv, item );
-		_debug( "PRINT (%d)[%s] item 0x%06X parent 0x%06X\n",
+		_debug( "PRINT (%d)[%s] item 0x%07X parent 0x%07X\n",
 			p2 - p1, p1, item, item->parent );
 		*rlb = 1;
 		break;
@@ -1352,10 +1356,12 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			Copy( p1, item->content, item->content_length + 1, char );
 			item->parent = tv->parser.last_parent;
 			ADD_ITEM( tv, item );
-			_debug( "PRINT (%d)[%s] item 0x%06X parent 0x%06X\n",
+			_debug( "PRINT (%d)[%s] item 0x%07X parent 0x%07X\n",
 				p2 - p1, p1, item, item->parent );
 			*rlb = 1;
 		}
+		else
+			goto default_action;
 		break;
 	case 'I':
 		if( *key == 'F' ) {
@@ -1367,7 +1373,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			ADD_ITEM( tv, item );
 			tv->parser.last_parent = item;
 			tv->parser.ppi = &item->child;
-			_debug( "IF [%s] item 0x%06X parent 0x%06X\n",
+			_debug( "IF [%s] item 0x%07X parent 0x%07X\n",
 				p1, item, item->parent );
 			*rlb = 1;
 		}
@@ -1395,10 +1401,12 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			item->content_length = p3 - item->content;
 			item->parent = tv->parser.last_parent;
 			ADD_ITEM( tv, item );
-			_debug( "INCLUDE [%s] item 0x%06X parent 0x%06X\n",
+			_debug( "INCLUDE [%s] item 0x%07X parent 0x%07X\n",
 				p1, item, item->parent );
 			*rlb = 1;
 		}
+		else
+			goto default_action;
 		break;
 	case 'E':
 		if( strcmp( key, "ND" ) == 0 ) {
@@ -1412,7 +1420,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 				tv->parser.ppi = &tv->parser.last_parent->child_last;
 				item->parent = tv->parser.last_parent;
 				ADD_ITEM( tv, item );
-				_debug( "END IF item 0x%06X parent 0x%06X\n", item, item->parent );
+				_debug( "END IF item 0x%07X parent 0x%07X\n", item, item->parent );
 			}
 			else if( my_stristr( p1, "LOOP" ) == p1 ) {
 				if( tv->parser.last_parent->parent == NULL
@@ -1443,7 +1451,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 				tv->parser.ppi = &tv->parser.last_parent->child_last;
 				item->parent = tv->parser.last_parent;
 				ADD_ITEM( tv, item );
-				_debug( "END LOOP [%s] [%s] item 0x%06X parent 0x%06X\n",
+				_debug( "END LOOP [%s] [%s] item 0x%07X parent 0x%07X\n",
 					item->content, item->val1, item, item->parent );
 			}
 			else if( my_stristr( p1, "SUB" ) == p1 ) {
@@ -1456,7 +1464,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 				tv->parser.ppi = &tv->parser.last_parent->child_last;
 				item->parent = tv->parser.last_parent;
 				ADD_ITEM( tv, item );
-				_debug( "END SUB item 0x%06X parent 0x%06X\n",
+				_debug( "END SUB item 0x%07X parent 0x%07X\n",
 					item, item->parent );
 			}
 			else {
@@ -1477,7 +1485,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			ADD_ITEM( tv, item );
 			tv->parser.last_parent = item;
 			tv->parser.ppi = &item->child;
-			_debug( "ELSE item 0x%06X parent 0x%06X\n", item, item->parent );
+			_debug( "ELSE item 0x%07X parent 0x%07X\n", item, item->parent );
 			*rlb = 1;
 		}
 		else if( strcmp( key, "LSIF" ) == 0 ) {
@@ -1494,10 +1502,12 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			ADD_ITEM( tv, item );
 			tv->parser.last_parent = item;
 			tv->parser.ppi = &item->child;
-			_debug( "ELSIF [%s] item 0x%06X parent 0x%06X\n",
+			_debug( "ELSIF [%s] item 0x%07X parent 0x%07X\n",
 				p1, item, item->parent );
 			*rlb = 1;
 		}
+		else
+			goto default_action;
 		break;
 	case 'L':
 		if( strcmp( key, "OOP" ) == 0 ) {
@@ -1526,10 +1536,12 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			ADD_ITEM( tv, item );
 			tv->parser.last_parent = item;
 			tv->parser.ppi = &item->child;
-			_debug( "LOOP [%s] [%s] [%s] item 0x%06X parent 0x%06X\n",
+			_debug( "LOOP [%s] [%s] [%s] item 0x%07X parent 0x%07X\n",
 				item->content, item->val1, item->val2, item, item->parent );
 			*rlb = 1;
 		}
+		else
+			goto default_action;
 		break;
 	case 'S':
 		if( strcmp( key, "UB" ) == 0 ) {
@@ -1541,10 +1553,12 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			ADD_ITEM( tv, item );
 			tv->parser.last_parent = item;
 			tv->parser.ppi = &item->child;
-			_debug( "SUB [%s] item 0x%06X parent 0x%06X\n",
+			_debug( "SUB [%s] item 0x%07X parent 0x%07X\n",
 				p1, item, item->parent );
 			*rlb = 1;
 		}
+		else
+			goto default_action;
 		break;
 	case '#':
 		item->id = PARSER_ITEM_COMMENT;
@@ -1553,7 +1567,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 		Copy( p1, item->content, item->content_length + 1, char );
 		item->parent = tv->parser.last_parent;
 		ADD_ITEM( tv, item );
-		_debug( "COMMENT [%s] item 0x%06X parent 0x%06X\n",
+		_debug( "COMMENT [%s] item 0x%07X parent 0x%07X\n",
 			p1, item, item->parent );
 		*rlb = 1;
 		break;
@@ -1568,10 +1582,13 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			ADD_ITEM( tv, item );
 			*rlb = 1;
 		}
+		else
+			goto default_action;
 		break;
 	case ':':
 		str = p1;
 	default:
+default_action:
 		_debug( "DO [%s]\n", str );
 		item->id = PARSER_ITEM_DO;
 		item->content_length = p2 - str;
@@ -1596,7 +1613,7 @@ int parse_template( my_thread_var_t *tv, const char *tpl, size_t len, int setpat
 	Newz( 1, tv->root_item, 1, my_parser_item_t );
 	tv->parser.last_parent = tv->root_item;
 	tv->parser.ppi = &tv->root_item->child;
-	_debug( "creating item 0x%06X parent 0x%06X\n",
+	_debug( "creating item 0x%07X parent 0x%07X\n",
 		tv->root_item, tv->root_item->parent );
 	if( len <= 256 ) {
 		if( setpath && tv->path_template != NULL ) {

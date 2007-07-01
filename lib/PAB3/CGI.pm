@@ -14,6 +14,7 @@ use vars qw(
 );
 
 use Carp ();
+use Time::HiRes ();
 
 use strict;
 no strict 'refs';
@@ -36,7 +37,7 @@ require Exporter;
 *import = \&Exporter::import;
 
 BEGIN {
-	$VERSION = '2.0.0';
+	$VERSION = '2.0.1';
 	*print_r = \&print_var;
 	$GLOBAL::MPREQ = undef;
 	$GLOBAL::MODPERL = 0;
@@ -120,7 +121,6 @@ sub cleanup {
 	undef %_REQUEST;
 	undef %_FILES;
 	undef %_COOKIE;
-	undef $GLOBAL::MPREQ;
 	undef $HeaderDone;
 	undef %HEAD;
 	print ''; # untie stdout
@@ -150,6 +150,17 @@ sub cleanup {
 		}
 	}
 	undef @CleanupHandler;
+	if( $PAB3::Statistic::VERSION ) {
+		if( $GLOBAL::MPREQ ) {
+			&PAB3::Statistic::send(
+				'CSN|' . $GLOBAL::MPREQ
+					. '|' . time
+					. '|' . &microtime()
+					. '|' . ( $GLOBAL::STATUS || $GLOBAL::MPREQ->status )
+			);
+		}
+	}
+	undef $GLOBAL::MPREQ;
 }
 
 sub cleanup_register {
@@ -243,6 +254,27 @@ sub init {
 			elsif( $GLOBAL::MODPERL == 1 ) {
 				$GLOBAL::MPREQ ||= Apache->request();
 				$GLOBAL::MPREQ->register_cleanup( \&cleanup );
+			}
+			if( $PAB3::Statistic::VERSION ) {
+				my $r = $GLOBAL::MPREQ;
+				my $s = $r->server();
+				my $s2 = $GLOBAL::MODPERL == 2
+					? Apache2::ServerUtil->server()
+					: $r->server()
+				;
+				my $c = $r->connection();
+				&PAB3::Statistic::send(
+					'ISN|' . $r
+						. '|' . time
+						. '|' . &microtime()
+						. '|' . $s->server_hostname
+						. '|' . ( $s->port || $s2->port )
+						. '|' . $s->is_virtual
+						. '|' . $r->document_root
+						. '|' . $r->uri
+						. '|' . ( $c->remote_host || $c->remote_ip )
+						. '|' . $GLOBAL::MODPERL
+				);
 			}
 		}
 		%HEAD = ();
@@ -493,6 +525,11 @@ sub decode_uri_component($) {
 	return $s;
 }
 
+sub microtime {
+	my( $sec, $usec ) = &Time::HiRes::gettimeofday();
+	return $sec + $usec / 1000000;
+}
+
 sub _parse_cookie {
 	my( $key, $val, $i, @in, $iv );
 	%_COOKIE = ();
@@ -560,10 +597,14 @@ sub _die_handler {
 	}
 	if( $GLOBAL::MPREQ ) {
 		$GLOBAL::MPREQ->log()->error( $s );
+		#$GLOBAL::MPREQ->status( 500 );
+		$GLOBAL::STATUS = 500;
+		Apache::exit() if $GLOBAL::MODPERL == 1;
 	}
 	else {
 		print STDERR '[error] Perl: ' . $str;
 	}
+#	return 500;
 	exit( 0 );
 }
 

@@ -22,14 +22,14 @@ BOOT:
 # * _get_address( var )
 # *****************************************************************************/
 
-UV
+U32
 _get_address( var )
 	SV *var;
 CODE:
 	if( SvROK( var ) )
-		RETVAL = (UV) SvRV( var );
+		RETVAL = (U32) SvRV( var );
 	else
-		RETVAL = (UV) var;
+		RETVAL = (U32) var;
 OUTPUT:
 	RETVAL
 
@@ -463,33 +463,35 @@ PPCODE:
 # * _strftime( format, ... )
 # *****************************************************************************/
 
-char *
+void
 _strftime( tid, format, ... )
 	UV tid;
-	const char *format;
+	SV *format;
 PREINIT:
 	dMY_CXT;
 	my_thread_var_t *tv;
-	long len, gmt;
+	STRLEN len;
+	int gmt;
 	my_vdatetime_t *tim;
 	time_t timestamp;
+	char *tmp, *fmt;
 CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
-	len = strlen( format );
+	fmt = SvPVx( format, len );
 	if( ! len ) {
-		RETVAL = NULL;
+		ST(0) = &PL_sv_undef;
 		goto exit;
 	}
 	len = 64 + len * 4;
-	New( 1, RETVAL, len, char );
+	New( 1, tmp, len, char );
 	if( items < 3 )
 		timestamp = time( 0 );
 	else
-		timestamp = SvUV( ST(2) );
+		timestamp = (time_t) SvUV( ST(2) );
 	if( items < 4 )
 		gmt = 0;
 	else
-		gmt = SvIV( ST(3) );
+		gmt = (long) SvIV( ST(3) );
 	if( ! gmt )
 		tim = apply_timezone( tv, &timestamp );
 	else {
@@ -498,19 +500,18 @@ CODE:
 		tim->tm_gmtoff = 0;
 		tim->tm_zone = DEFAULT_ZONE;
 	}
-	_int_strftime( tv, RETVAL, len, format, tim );
+	len = _int_strftime( tv, tmp, len, fmt, tim );
+	ST(0) = sv_2mortal( newSVpv( tmp, len ) );
+	Safefree( tmp );
 exit:
-OUTPUT:
-	RETVAL
-CLEANUP:
-	Safefree( RETVAL );
+	{}
 
 
 #/*****************************************************************************
 # * _strfmon( tid, format, number )
 # *****************************************************************************/
 
-char *
+void
 _strfmon( tid, format, number )
 	UV tid;
 	const char *format;
@@ -518,14 +519,12 @@ _strfmon( tid, format, number )
 PREINIT:
 	dMY_CXT;
 	my_thread_var_t *tv;
+	size_t len;
+	char tmp[64];
 CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
-	New( 1, RETVAL, 64, char );
-	_int_strfmon( tv, RETVAL, 64, format, number );
-OUTPUT:
-	RETVAL
-CLEANUP:
-	Safefree( RETVAL );
+	len = _int_strfmon( tv, tmp, 64, format, number );
+	ST(0) = sv_2mortal( newSVpvn( tmp, len ) );
 
 
 #/*****************************************************************************

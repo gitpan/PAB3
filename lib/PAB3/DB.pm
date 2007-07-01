@@ -16,7 +16,7 @@ no warnings 'numeric';
 use vars qw($VERSION);
 
 BEGIN {
-	$VERSION = '1.1.1';
+	$VERSION = '1.1.2';
 
 	*fetch_array = \&fetch_row;
 	*new = \&connect;
@@ -135,12 +135,15 @@ sub clone {
 
 sub query {
 	my( $this ) = @_;
-	my $pkg = $this->[$DB_PKG];
+	my( $pkg, $retval, $res, $ts );
+	$pkg = $this->[$DB_PKG];
 	if( $this->[$DB_LOGGER] ) {
 		$this->[$DB_LOGGER]->send( 'SQL: ' . $_[1], 4 );
 	}
+	if( $PAB3::Statistic::VERSION ) {
+		$ts = &microtime();
+	}
 	$this->[$DB_LASTQUERY] = $_[1];
-	my $retval;
 	if( $GLOBAL::DEBUG ) {
 		my $rt = &microtime();
 		$retval = &{"$${pkg}::query"}( $this->[$DB_LINKID], $_[1] );
@@ -160,25 +163,32 @@ sub query {
 	if( ! $retval ) {
 		return &_set_db_error( $this );
 	}
+	if( $PAB3::Statistic::VERSION ) {
+		&PAB3::Statistic::send( 'SQLQ|' . ( $GLOBAL::MPREQ || '' )
+			. '|' . time . '|' . $ts . '|' . &microtime() . '|' . $_[1]
+		);
+	}
 	return 1 if $retval == 1;
-	my $res = $this->_create_item( 'PAB3::DB::RES_' );
+	$res = $this->_create_item( 'PAB3::DB::RES_' );
 	$res->[$DB_QUERYID] = $this->[$DB_QUERYID] = $retval;
 	return $res;
 }
 
 sub prepare {
 	my( $this ) = @_;
-	my $pkg = $this->[$DB_PKG];
+	my( $pkg, $stmtid, $stmt, $ts );
+	$pkg = $this->[$DB_PKG];
 	if( $this->[$DB_LOGGER] ) {
 		$this->[$DB_LOGGER]->send( 'SQL: ' . $_[1], 4 );
 	}
+	if( $PAB3::Statistic::VERSION ) {
+		$ts = &microtime();
+	}
 	$this->[$DB_LASTQUERY] = $_[1];
-	my $stmtid;
 	if( $GLOBAL::DEBUG ) {
 		my $rt = &microtime();
 		$stmtid = &{"$${pkg}::prepare"}( $this->[$DB_LINKID], $_[1] );
-		$rt = &microtime() - $rt;
-		$rt = sprintf( '%0.3f', $rt * 1000 );
+		$rt = sprintf( '%0.3f', ( &microtime() - $rt ) * 1000 );
 		if( $PAB3::CGI::VERSION ) {
 			print "<p><code>" . $_[1] . "</code><br>"
 				. "<i><font color=gray>($rt ms)</font></i></p>\n";
@@ -193,8 +203,14 @@ sub prepare {
 	if( ! $stmtid ) {
 		return &_set_db_error( $this );
 	}
-	my $stmt = $this->_create_item( 'PAB3::DB::STMT_' );
+	$stmt = $this->_create_item( 'PAB3::DB::STMT_' );
 	$stmt->[$DB_QUERYID] = $stmtid;
+	if( $PAB3::Statistic::VERSION ) {
+		&PAB3::Statistic::send( 'SQLP|' . ( $GLOBAL::MPREQ || '' )
+			. '|' . time . '|' . $stmt . '|' . $ts . '|' . &microtime()
+			. '|' . $_[1]
+		);
+	}
 	return $stmt;
 }
 
@@ -436,6 +452,7 @@ sub _create_item {
 	$item->[$DB_DIE] = $this->[$DB_DIE];
 	$item->[$DB_WARN] = $this->[$DB_WARN];
 	$item->[$DB_LOGGER] = $this->[$DB_LOGGER];
+#	$item->[$DB_LASTQUERY] = $this->[$DB_LASTQUERY];
 	bless( $item, $class );
 	return $item;
 }
@@ -515,14 +532,24 @@ sub bind_param {
 
 sub execute {
 	my $this = shift;
-	my $pkg = $this->[$DB_PKG];
+	my( $pkg, $resid, $res, $ts );
+	$pkg = $this->[$DB_PKG];
 	#print "params: ", $this->[$DB_QUERYID], '|', join( '|', @_ ), "\n";
-	my $resid = &{"$${pkg}::execute"}( $this->[$DB_QUERYID], @_ );
+	if( $PAB3::Statistic::VERSION ) {
+		$ts = &PAB3::DB::microtime();
+	}
+	$resid = &{"$${pkg}::execute"}( $this->[$DB_QUERYID], @_ );
 	if( ! $resid ) {
 		return &_set_db_error( $this );
 	}
+	if( $PAB3::Statistic::VERSION ) {
+		&PAB3::Statistic::send( 'SQLE|' . ( $GLOBAL::MPREQ || '' )
+			. '|' . time . '|' . $this
+			. '|'  . $ts . '|' . &PAB3::DB::microtime()
+		);
+	}
 	return $this if $resid == $this->[$DB_QUERYID];
-	my $res = &PAB3::DB::_create_item( $this, 'PAB3::DB::RES_' );
+	$res = &PAB3::DB::_create_item( $this, 'PAB3::DB::RES_' );
 	$res->[$DB_QUERYID] = $resid;
 	return $res;
 }

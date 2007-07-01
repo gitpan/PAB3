@@ -131,9 +131,12 @@ CODE:
 	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto error;
 	tv->last_error[0] = '\0';
 	tmp = SvPVx( template, ltmp );
+	_debug( "parse_template\n" );
 	if( ! parse_template( tv, tmp, ltmp, 1 ) ) goto error;
 	optimize_script( tv, tv->root_item );
+	_debug( "map_parsed\n" );
 	if( ! map_parsed( tv, tv->root_item, 0 ) ) goto error;
+	_debug( "build_script\n" );
 	if( ! build_script( tv ) ) goto error;
 	ST(0) = sv_2mortal( newSVpvn( tv->parser.output, tv->parser.curout - tv->parser.output ) );
 	my_parser_session_cleanup( tv );

@@ -10,7 +10,8 @@
 #include "my_utils.h"
 
 
-const static int mday_array[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+const static int mday_array[] =
+	{ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
 
 void parse_vdatetime( const char *str, my_vdatetime_t *tms );
@@ -355,7 +356,7 @@ almost posix compatible
 int _int_strftime( tv, str, maxlen, format, stime )
 	my_thread_var_t *tv;
 	char *str;
-	int maxlen;
+	size_t maxlen;
 	const char *format;
 	my_vdatetime_t *stime;
 {
@@ -1318,7 +1319,52 @@ char *my_strrev( char *str, size_t len ) {
 	return str;
 }
 
-char *my_itoa( char *str, int value, int radix ) {
+char *my_itoa( char *str, long value, int radix ) {
+	int rem;
+	char *ret = str;
+	switch( radix ) {
+	case 16:
+		do {
+			rem = value % 16;
+			value /= 16;
+			switch( rem ) {
+			case 10:
+				*ret ++ = 'A';
+				break;
+			case 11:
+				*ret ++ = 'B';
+				break;
+			case 12:
+				*ret ++ = 'C';
+				break;
+			case 13:
+				*ret ++ = 'D';
+				break;
+			case 14:
+				*ret ++ = 'E';
+				break;
+			case 15:
+				*ret ++ = 'F';
+				break;
+			default:
+				*ret ++ = (char) ( rem + 0x30 );
+				break;
+			}
+		} while( value != 0 );
+		break;
+	default:
+		do {
+			rem = value % radix;
+			value /= radix;
+			*ret ++ = (char) ( rem + 0x30 );
+		} while( value != 0 );
+	}
+	*ret = '\0' ;
+	my_strrev( str, ret - str );
+	return ret;
+}
+
+char *my_ltoa( char *str, XLONG value, int radix ) {
 	int rem;
 	char *ret = str;
 	switch( radix ) {

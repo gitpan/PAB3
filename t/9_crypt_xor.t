@@ -7,22 +7,22 @@ $_pos = 1;
 require PAB3::Crypt::XOR;
 _check( 1 );
 
-import PAB3::Crypt::XOR;
+import PAB3::Crypt::XOR qw(:default);
 _check( 1 );
 
 $key = 'bla';
 $plain = 'THIS IS A REAL PLAIN TEXT';
 
-$cipher = &PAB3::Crypt::XOR::encrypt( $key, $plain );
+$cipher = &xor_encrypt( $key, $plain );
 _check( $cipher );
 
-$plain2 = &PAB3::Crypt::XOR::decrypt( $key, $cipher );
+$plain2 = &xor_decrypt( $key, $cipher );
 _check( $plain eq $plain2 );
 
-$cipher = &PAB3::Crypt::XOR::encrypt_hex( $key, $plain );
+$cipher = &xor_encrypt_hex( $key, $plain );
 _check( $cipher );
 
-$plain2 = &PAB3::Crypt::XOR::decrypt_hex( $key, $cipher );
+$plain2 = &xor_decrypt_hex( $key, $cipher );
 _check( $plain eq $plain2 );
 
 BEGIN {

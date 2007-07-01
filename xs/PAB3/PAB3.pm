@@ -22,7 +22,7 @@ use constant {
 };
 
 BEGIN {
-	$VERSION = '3.1.2';
+	$VERSION = '3.1.3';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	if( ! $PAB3::CGI::VERSION ) {
@@ -926,6 +926,17 @@ Example:
   - or -
   
   $pab->require_and_run( 'foo.pl' );
+
+
+=item print_var ( ... )
+
+=item print_r ( ... )
+
+Prints human-readable information about one or more variables 
+
+Example:
+
+  &PAB3::print_r( \%ENV );
 
 
 =back

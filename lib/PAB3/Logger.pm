@@ -13,7 +13,7 @@ use Carp ();
 use vars qw($VERSION);
 
 BEGIN {
-	$VERSION = '1.0.0';
+	$VERSION = '1.0.1';
 }
 
 our @LOG_ITEM = ( 'None', 'Error', 'Warning', 'Info', 'Debug' );
@@ -99,12 +99,11 @@ sub close {
 
 sub send {
 	my( $this, $message, $loglevel ) = @_;
-	my( $li_client, $li_elapsed, $li_item, $li_time, $hlog, $time );
+	my( $li_client, $li_elapsed, $li_item, $li_time, $hlog, $time, $msg );
 	$loglevel = 3 unless defined $loglevel;
 	$hlog = $this->[$LOG_HANDLE];
-	return 0 if ! $loglevel || $this->[$LOG_LEVEL] < $loglevel;
 	return 0 unless $message;
-	return 0 unless defined $hlog;
+	return 0 if ! $loglevel || $this->[$LOG_LEVEL] < $loglevel;
 	$li_time = $this->_unix_as_logtime();
 	$li_item = $LOG_ITEM[$loglevel];
 	$time = &_microtime();
@@ -113,12 +112,19 @@ sub send {
 	);
 	$li_client = $ENV{'REMOTE_ADDR'} || $ENV{'USER'} || '-unknown-';
 	if( $this->[$LOG_FMTSUB] ) {
-		print $hlog $this->[$LOG_FMTSUB]->( $li_time, $li_elapsed, $li_client, $this->[$LOG_RTID] )
-			, " $li_item\: ", $message, "\n";
+		$msg = $this->[$LOG_FMTSUB]->(
+			$li_time, $li_elapsed, $li_client, $this->[$LOG_RTID]
+		) . " $li_item\: $message";
 	}
 	else {
-		print $hlog "[$li_time] [$$] [$li_client] [$li_elapsed] $li_item\: $message\n";
+		$msg = "[$li_time] [$$] [$li_client] [$li_elapsed] $li_item\: $message";
 	}
+	if( $PAB3::Statistic::VERSION ) {
+		my $r = $GLOBAL::MPREQ || '';
+		&PAB3::Statistic::send( "LOG|$r|" . time . "|$msg" );
+	}
+	return 0 unless defined $hlog;
+	print $hlog $msg . "\n";
 	return 1;
 }
 

@@ -7,18 +7,20 @@
 
 #define __PACKAGE__ "PAB3::Utils"
 
-#ifndef DWORD
+#undef DWORD
 #define DWORD unsigned long
-#endif
 
-#ifndef my_longlong
+#undef XLONG
+#undef UXLONG
 #if defined __unix__
-#define my_longlong long long
-#elif defined _WIN32
-#define my_longlong __int64
+#	define XLONG long long
+#	define UXLONG unsigned long long
+#elif defined __WIN__
+#	define XLONG __int64
+#	define UXLONG unsigned __int64
 #else
-#define my_longlong long
-#endif
+#	define XLONG long
+#	define UXLONG unsigned long
 #endif
 
 typedef struct st_my_vdatetime {
@@ -108,7 +110,8 @@ typedef struct st_my_cxt {
 START_MY_CXT
 
 #define ISWHITECHAR(ch) \
-	( (ch) == 32 || (ch) == 10 || (ch) == 13 || (ch) == 9 || (ch) == 0 || (ch) == 11 )
+	( (ch) == 32 || (ch) == 10 || (ch) == 13 || (ch) == 9 || (ch) == 0 \
+	|| (ch) == 11 )
 
 #define WKDAY_TO_NUM( wkd ) ( \
 	( (wkd)[0] == 'S' && (wkd)[1] == 'U' ) ? 0 : \
@@ -152,7 +155,8 @@ char *PerlIO_fgets( char *buf, size_t max, PerlIO *stream );
 
 char *my_strncpy( char *dst, const char *src, unsigned long len );
 char *my_strcpy( char *dst, const char *src );
-char *my_itoa( char* str, int value, int radix );
+char *my_itoa( char* str, long value, int radix );
+char *my_ltoa( char* str, XLONG value, int radix );
 
 #define find_or_create_tv(cxt,tv,tid) \
 	if( ! ( (tv) = find_thread_var( (cxt), (tid) ) ) ) \
@@ -166,13 +170,23 @@ void cleanup_my_utils( my_cxt_t *cxt );
 void copy_tm_to_vdatetime( struct tm *src, my_vdatetime_t *dst );
 void free_locale_alias( my_cxt_t *cxt );
 void read_locale_alias( my_cxt_t *cxt );
-const char *get_locale_format_settings( my_cxt_t *cxt, const char *id, my_locale_t *locale );
-int _int_strftime( my_thread_var_t *tv, char *str, int maxlen, const char *format, my_vdatetime_t *stime );
-size_t _int_strfmon( my_thread_var_t *tv, char *str, size_t maxsize, const char *format, ... );
+const char *get_locale_format_settings(
+	my_cxt_t *cxt, const char *id, my_locale_t *locale
+);
+int _int_strftime(
+	my_thread_var_t *tv, char *str, size_t maxlen, const char *format,
+	my_vdatetime_t *stime
+);
+size_t _int_strfmon(
+	my_thread_var_t *tv, char *str, size_t maxsize, const char *format, ...
+);
 int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz );
 #define read_timezone parse_timezone
 my_vdatetime_t *apply_timezone( my_thread_var_t *tv, time_t *timer );
-char *_int_number_format( double value, char *str, int maxlen, int fd, char dp, char ts, char ns, char ps, int zf, char fc );
+char *_int_number_format(
+	double value, char *str, int maxlen, int fd, char dp, char ts, char ns,
+	char ps, int zf, char fc
+);
 double _my_round( double num, int prec );
 
 #endif

@@ -1,19 +1,24 @@
 Revision history for Perl extension PAB3.
 
+version 3.1.3
+    - fixed parser which did not correct handle items without directive
+    - fixed memory allocation in the optimizer, which did allocate insufficient
+      number of bytes
+
 version 3.1.2
-    - fixed MY_CXT handling to run with perl5.9.x
+    - fixed MY_CXT api handling to run with perl/5.9.x
 
 version 3.1.1
-    - bugfix: internal output buffer in PAB3::Utils::strftime was calulated
-      to small, that the result string may be cut
-    - fixed return values in several functions at PAB3::DB::Max
-    - fixed broken statement error handling in PAB3::DB
+    - bugfix: internal output buffer in PAB3::Utils::strftime was calculated
+      to small - the result string may be cut
+    - fixed return values of several functions in the PAB3::DB::Max module
+    - fixed broken statement error handling in the PAB3::DB module
     - fixed broken parameter binding in PAB3::DB::Driver::Prosgres::execute()
       method
-    - fixed broke statement names in module PAB3::DB::Driver::Prosgres
-    - fixed misplaced code in prepare() and execute() functions in
-      PAB3::DB::Driver::Mysql
-    - fixed PAB3::DB::Driver::Sqlite3::execute() method which returns an
+    - fixed broken statement names in the PAB3::DB::Driver::Prosgres module
+    - fixed misplaced code of prepare() and execute() functions in the
+      PAB3::DB::Driver::Mysql module
+    - fixed PAB3::DB::Driver::Sqlite3::execute() method which did return an
       error on second and further calls
 
 version 3.1.0
@@ -24,4 +29,4 @@ version 3.1.0
     - functions PAB3::make_script and PAB3::run_script are deprecated and has
       been removed
     - PAB3::HashMapCache has been renamed into PAB3::HashmapCache
-    - support for aliases in locale settings
+    - support of aliases in locale settings

@@ -1,7 +1,7 @@
 Revision history for Perl extension PAB3::DB::Driver::Postgres.
 
 version 1.0.4
-    - fixed MY_CXT handling to run with perl5.9.x
+    - fixed MY_CXT api handling to run with perl/5.9.x
 
 version 1.0.3
     - added missing file

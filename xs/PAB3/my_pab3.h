@@ -1,5 +1,5 @@
 #ifndef __INCLUDE_MY_PAB3_H__
-#define __INCLUDE_MY_PAB3_H__
+#define __INCLUDE_MY_PAB3_H__ 1
 
 #include <EXTERN.h>
 #include <perl.h>
@@ -140,8 +140,6 @@ typedef struct st_my_cxt {
 
 START_MY_CXT
 
-#define _debug
-
 static const my_thread_var_t THREADVAR_DEFAULT = {
 	NULL, NULL, NULL, "<*", 2, "*>", 2, ";;", 2, NULL, 0, NULL, 0,
 	"$PAB3::_CURRENT", 15, "_", 1, NULL, "", NULL, 0, NULL,
@@ -186,5 +184,36 @@ void my_parser_item_free( my_parser_item_t *pi );
 int map_parsed( my_thread_var_t *tv, my_parser_item_t *parent, int level );
 int build_script( my_thread_var_t *tv );
 void optimize_script( my_thread_var_t *tv, my_parser_item_t *parent );
+
+//#define DEBUG 1
+#ifdef DEBUG
+#define _debug printf
+#else
+#define _debug
+#endif
+
+#ifdef DEBUG
+//#define Newx(v,n,t)	(v = (MEM_WRAP_CHECK_(n,t) (t*)safemalloc((MEM_SIZE)((n)*sizeof(t)))))
+#undef New
+#define New(x,v,n,t) \
+	v = (t *) safemalloc( (size_t)((n) * sizeof(t)) ); \
+	_debug( "0x%08x New(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ );
+//	  (v = (MEM_WRAP_CHECK_(n,t) (t*)saferealloc((Malloc_t)(v),(MEM_SIZE)((n)*sizeof(t)))))
+#undef Renew
+#define Renew(v,n,t) \
+	v = (t *) saferealloc( (Malloc_t)(v), (size_t)((n) * sizeof(t)) ); \
+	_debug( "0x%08x Renew(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ );
+#undef Safefree
+#define Safefree(d) \
+	if( (d) != NULL ) { \
+		_debug( "0x%08x Safefree called at %s:%d\n", (d), __FILE__, __LINE__ ); \
+		safefree( (Malloc_t)(d) ); \
+	}
+//(MEM_WRAP_CHECK_(n,t) (void)memcpy((char*)(d),(const char*)(s), (n) * sizeof(t)))
+#undef Copy
+#define Copy(s,d,n,t) \
+	(void)memcpy( (char*)(d), (const char*)(s), (n) * sizeof(t) ); \
+	_debug( "0x%08x Copy %u x %u from 0x%08x at %s:%d\n", (d), (n), sizeof(t), (s), __FILE__, __LINE__ );
+#endif
 
 #endif

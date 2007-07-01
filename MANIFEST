@@ -17,6 +17,8 @@ lib/PAB3/Output/Object.pm
 lib/PAB3/Session.pm
 t/0_pab_00_basic.t
 t/0_pab_01_parser.t
+t/0_pab_cgi_00_basic.t
+t/0_pab_cgi_01_request.t
 t/5_utils_00_basic.t
 t/5_utils_01_time.t
 t/5_utils_02_class.t
