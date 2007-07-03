@@ -151,14 +151,12 @@ sub cleanup {
 	}
 	undef @CleanupHandler;
 	if( $PAB3::Statistic::VERSION ) {
-		if( $GLOBAL::MPREQ ) {
-			&PAB3::Statistic::send(
-				'CSN|' . $GLOBAL::MPREQ
-					. '|' . time
-					. '|' . &microtime()
-					. '|' . ( $GLOBAL::STATUS || $GLOBAL::MPREQ->status )
-			);
-		}
+		&PAB3::Statistic::send(
+			'CSN|' . ( $GLOBAL::MPREQ || $$ )
+				. '|' . time
+				. '|' . &microtime()
+				. '|' . ( $GLOBAL::STATUS || ( $GLOBAL::MPREQ ? $GLOBAL::MPREQ->status : 200 ) )
+		);
 	}
 	undef $GLOBAL::MPREQ;
 }
@@ -274,6 +272,23 @@ sub init {
 						. '|' . $r->uri
 						. '|' . ( $c->remote_host || $c->remote_ip )
 						. '|' . $GLOBAL::MODPERL
+				);
+			}
+		}
+		else {
+			my $iru = index( $ENV{'REQUEST_URI'}, '?' );
+			if( $PAB3::Statistic::VERSION ) {
+				&PAB3::Statistic::send(
+					'ISN|' . $$
+						. '|' . time
+						. '|' . &microtime()
+						. '|' . $ENV{'SERVER_NAME'}
+						. '|' . $ENV{'SERVER_PORT'}
+						. '|' . '2'
+						. '|' . $ENV{'DOCUMENT_ROOT'}
+						. '|' . ( $iru > 0 ? substr( $ENV{'REQUEST_URI'}, 0, $iru ) : $ENV{'REQUEST_URI'} )
+						. '|' . $ENV{'REMOTE_ADDR'}
+						. '|' . '0'
 				);
 			}
 		}

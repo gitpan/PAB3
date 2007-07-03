@@ -150,10 +150,22 @@ static const my_thread_var_t THREADVAR_DEFAULT = {
 #define ISWHITECHAR(ch) \
 	( (ch) == 32 || (ch) == 10 || (ch) == 13 || (ch) == 9 || (ch) == 0 || (ch) == 11 )
 
+//#define DEBUG 1
+#ifdef DEBUG
+#define _debug printf
+#define my_strcpy(d,s) _my_strcpy_dbg( (d), (s), __FILE__, __LINE__ )
+#else
+#define _debug
+#define my_strcpy(d,s) _my_strcpy( (d), (s) )
+#endif
+
 const char *my_stristr( const char *str, const char *pattern );
 int my_stricmp( const char *cs, const char *ct );
 char *my_strncpyu( char *dst, const char *src, unsigned long len );
-char *my_strcpy( char *dst, const char *src );
+char *_my_strcpy( char *dst, const char *src );
+#ifdef DEBUG
+char *_my_strcpy_dbg( char *dst, const char *src, const char *file, int line );
+#endif
 char *my_strncpy( char *dst, const char *src, unsigned long len );
 char* my_itoa( char* str, int value, int radix );
 
@@ -184,13 +196,6 @@ void my_parser_item_free( my_parser_item_t *pi );
 int map_parsed( my_thread_var_t *tv, my_parser_item_t *parent, int level );
 int build_script( my_thread_var_t *tv );
 void optimize_script( my_thread_var_t *tv, my_parser_item_t *parent );
-
-//#define DEBUG 1
-#ifdef DEBUG
-#define _debug printf
-#else
-#define _debug
-#endif
 
 #ifdef DEBUG
 //#define Newx(v,n,t)	(v = (MEM_WRAP_CHECK_(n,t) (t*)safemalloc((MEM_SIZE)((n)*sizeof(t)))))

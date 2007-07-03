@@ -16,7 +16,7 @@ BOOT:
 }
 
 #/*****************************************************************************
-# * new( class, ... )
+# * _new( class, ... )
 # *****************************************************************************/
 
 void
@@ -108,10 +108,11 @@ PREINIT:
 	dMY_CXT;
 	my_thread_var_t *tv;
 PPCODE:
-	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) return;
-	my_parser_session_cleanup( tv );
-	my_loop_def_cleanup( tv );
-	my_hashmap_cleanup( tv );
+	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) != NULL ) {
+		my_parser_session_cleanup( tv );
+		my_loop_def_cleanup( tv );
+		my_hashmap_cleanup( tv );
+	}
 
 
 #/*****************************************************************************

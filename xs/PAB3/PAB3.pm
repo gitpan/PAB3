@@ -4,7 +4,7 @@ package PAB3;
 # Module: PAB3
 # Use "perldoc PAB3" for documentation 
 # =============================================================================
-use Carp;
+use Carp ();
 use Symbol ();
 
 use strict;
@@ -22,7 +22,7 @@ use constant {
 };
 
 BEGIN {
-	$VERSION = '3.1.3';
+	$VERSION = '3.1.4';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	if( ! $PAB3::CGI::VERSION ) {
@@ -203,7 +203,7 @@ sub require {
 	$fid = $file . '_' . $package;
 	$fid =~ s/\W/_/go;
 	if( $package eq $fid ) {
-		die "Script requires itself";
+		&Carp::croak( 'Script requires itself' );
 	}
 	@fs = stat( $file );
 	$cache = $SC{$fid};
@@ -245,7 +245,7 @@ sub require_and_run {
 	$fid = $file . '_' . $package;
 	$fid =~ s/\W/_/go;
 	if( $package eq $fid ) {
-		&Carp::croak( "Script requires itself" );
+		&Carp::croak( 'Script requires itself' );
 	}
 	@fs = stat( $file );
 	$cache = $SC{$fid};

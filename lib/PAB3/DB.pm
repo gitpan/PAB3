@@ -164,7 +164,7 @@ sub query {
 		return &_set_db_error( $this );
 	}
 	if( $PAB3::Statistic::VERSION ) {
-		&PAB3::Statistic::send( 'SQLQ|' . ( $GLOBAL::MPREQ || '' )
+		&PAB3::Statistic::send( 'SQLQ|' . ( $GLOBAL::MPREQ || $$ )
 			. '|' . time . '|' . $ts . '|' . &microtime() . '|' . $_[1]
 		);
 	}
@@ -206,7 +206,7 @@ sub prepare {
 	$stmt = $this->_create_item( 'PAB3::DB::STMT_' );
 	$stmt->[$DB_QUERYID] = $stmtid;
 	if( $PAB3::Statistic::VERSION ) {
-		&PAB3::Statistic::send( 'SQLP|' . ( $GLOBAL::MPREQ || '' )
+		&PAB3::Statistic::send( 'SQLP|' . ( $GLOBAL::MPREQ || $$ )
 			. '|' . time . '|' . $stmt . '|' . $ts . '|' . &microtime()
 			. '|' . $_[1]
 		);
@@ -543,7 +543,7 @@ sub execute {
 		return &_set_db_error( $this );
 	}
 	if( $PAB3::Statistic::VERSION ) {
-		&PAB3::Statistic::send( 'SQLE|' . ( $GLOBAL::MPREQ || '' )
+		&PAB3::Statistic::send( 'SQLE|' . ( $GLOBAL::MPREQ || $$ )
 			. '|' . time . '|' . $this
 			. '|'  . $ts . '|' . &PAB3::DB::microtime()
 		);

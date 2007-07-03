@@ -53,18 +53,32 @@ char *my_strncpy( char *dst, const char *src, unsigned long len ) {
 	return dst;
 }
 
-char *my_strcpy( char *dst, const char *src ) {
+char *_my_strcpy( char *dst, const char *src ) {
 	char ch;
 	while( 1 ) {
 		if( ( ch = *src ++ ) == '\0' ) {
-			*dst = '\0';
-			return dst;
+			break;
 		}
 		*dst ++ = ch;
 	}
 	*dst = '\0';
 	return dst;
 }
+
+#ifdef DEBUG
+char *_my_strcpy_dbg( char *dst, const char *src, const char *file, int line ) {
+	_debug( "0x%08x my_strcpy from 0x%08x at %s:%d\n", dst, src, file, line );
+	char ch;
+	while( 1 ) {
+		if( ( ch = *src ++ ) == '\0' ) {
+			break;
+		}
+		*dst ++ = ch;
+	}
+	*dst = '\0';
+	return dst;
+}
+#endif
 
 char *my_strncpyu( char *dst, const char *src, unsigned long len ) {
 	char ch;
@@ -616,7 +630,7 @@ item_print:
 			}
 			break;
 		default:
-			if( found > 1 ) {
+			if( found >= 1 ) {
 				str[str_pos] = '\0';
 				pf->id = PARSER_ITEM_PRINT;
 				pf->content_length = str_pos;
@@ -642,7 +656,7 @@ item_print:
 			break;
 		}
 	}
-	if( found > 1 ) {
+	if( found >= 1 ) {
 		str[str_pos] = '\0';
 		pf->id = PARSER_ITEM_PRINT;
 		pf->content_length = str_pos;
@@ -668,7 +682,7 @@ item_print:
 #define OUTPUT_ADD_SIZE 1024
 
 #define OUTPUT_ENSURE(tv,len) \
-	if( (DWORD) ((tv)->parser.curout - (tv)->parser.output) < (DWORD) (len) ) { \
+	if( (DWORD) ((tv)->parser.curout - (tv)->parser.output) + (DWORD) (len) > (tv)->parser.output_length ) { \
 		(tv)->parser.output_length += (len) + OUTPUT_ADD_SIZE; \
 		(tv)->parser.output_pos = (tv)->parser.curout - (tv)->parser.output; \
 		Renew( (tv)->parser.output, (tv)->parser.output_length + 1, char ); \
@@ -1157,7 +1171,7 @@ int build_script( my_thread_var_t *tv ) {
 	if( ! build_script_int( tv, tv->root_item, 1 ) ) return 0;
 	OUTPUT_ENSURE( tv, 6 );
 	tv->parser.curout = my_strcpy( tv->parser.curout, "}\n\n1;\n" );
-	//printf( "script:\n%s\n", tv->parser.output );
+	_debug( "script:\n%s\n", tv->parser.output );
 	return 1;
 }
 

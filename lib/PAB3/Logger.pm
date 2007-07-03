@@ -120,7 +120,7 @@ sub send {
 		$msg = "[$li_time] [$$] [$li_client] [$li_elapsed] $li_item\: $message";
 	}
 	if( $PAB3::Statistic::VERSION ) {
-		my $r = $GLOBAL::MPREQ || '';
+		my $r = $GLOBAL::MPREQ || $$;
 		&PAB3::Statistic::send( "LOG|$r|" . time . "|$msg" );
 	}
 	return 0 unless defined $hlog;
