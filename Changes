@@ -1,5 +1,8 @@
 Revision history for Perl extension PAB3.
 
+version 3.1.5
+    - fixed type conversations on 64bit systems
+
 version 3.1.4
     - fixed memory allocation in the script builder, which did allocate
       insufficient number of bytes

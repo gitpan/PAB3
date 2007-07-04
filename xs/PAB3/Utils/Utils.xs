@@ -22,14 +22,14 @@ BOOT:
 # * _get_address( var )
 # *****************************************************************************/
 
-U32
+void *
 _get_address( var )
 	SV *var;
 CODE:
 	if( SvROK( var ) )
-		RETVAL = (U32) SvRV( var );
+		RETVAL = SvRV( var );
 	else
-		RETVAL = (U32) var;
+		RETVAL = var;
 OUTPUT:
 	RETVAL
 

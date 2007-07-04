@@ -21,6 +21,19 @@
 #undef DWORD
 #define DWORD unsigned long
 
+#undef XLONG
+#undef UXLONG
+#if defined __unix__
+#	define XLONG long long
+#	define UXLONG unsigned long long
+#elif defined __WIN__
+#	define XLONG __int64
+#	define UXLONG unsigned __int64
+#else
+#	define XLONG long
+#	define UXLONG unsigned long
+#endif
+
 #undef MAX
 #define MAX(x,y) ( (x) < (y) ? (y) : (x) )
 #undef MIN
