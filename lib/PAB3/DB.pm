@@ -70,8 +70,13 @@ our $LastErrno = 0;
 
 sub DESTROY {
 	my $this = shift or return;
-	my $pkg = $this->[$DB_PKG];
-	&{"$${pkg}::close"}( $this->[$DB_LINKID] );
+	$this->close();
+#	my $pkg = $this->[$DB_PKG];
+#	&{"$${pkg}::close"}( $this->[$DB_LINKID] );
+}
+
+sub CLONE_SKIP {
+	return 1;
 }
 
 sub connect {
@@ -100,7 +105,7 @@ sub connect {
 			( $arg{'socket'} || $arg{'host'} || $arg{'db'} )
 		;
 		$this->[$DB_LOGGER]->info(
-			'Connecting to ' . $arg{'driver'} . ' -> ' . $info
+			'Connecting to [' . $arg{'driver'} . '] ' . $info
 		);
 	}
 	$this->[$DB_LINKID] = &{"${pkg}::db_connect"}( %arg );
@@ -117,6 +122,16 @@ sub connect {
 sub close {
 	my( $this ) = @_;
 	my $pkg = $this->[$DB_PKG];
+	if( $this->[$DB_LOGGER] ) {
+		my $arg = $this->[$DB_ARGV];
+		my $info = ( $arg->{'user'} ? $arg->{'user'} . '@' : '' );
+		$info .=
+			( $arg->{'socket'} || $arg->{'host'} || $arg->{'db'} )
+		;
+		$this->[$DB_LOGGER]->info(
+			'Closing connection to [' . $arg->{'driver'} . '] ' . $info
+		);
+	}
 	&{"$${pkg}::close"}( $this->[$DB_LINKID] ) or return 0;
 	$this->[$DB_LINKID] = 0;
 	return 1;
@@ -150,11 +165,11 @@ sub query {
 		$rt = &microtime() - $rt;
 		$rt = sprintf( '%0.3f', $rt * 1000 );
 		if( $PAB3::CGI::VERSION ) {
-			print "<p><code>" . $_[1] . "</code><br>"
+			print "<p><code>$_[1]\</code><br>"
 				. "<i><font color=gray>($rt ms)</font></i></p>\n";
 		}
 		else {
-			print $_[1], "\n(", $rt, " ms)\n";
+			print "$_[1]\n($rt ms)\n";
 		}
 	}
 	else {
@@ -190,11 +205,11 @@ sub prepare {
 		$stmtid = &{"$${pkg}::prepare"}( $this->[$DB_LINKID], $_[1] );
 		$rt = sprintf( '%0.3f', ( &microtime() - $rt ) * 1000 );
 		if( $PAB3::CGI::VERSION ) {
-			print "<p><code>" . $_[1] . "</code><br>"
+			print "<p><code>$_[1]\</code><br>"
 				. "<i><font color=gray>($rt ms)</font></i></p>\n";
 		}
 		else {
-			print $_[1], "\n(", $rt, " ms)\n";
+			print "$_[1]\n($rt ms)\n";
 		}
 	}
 	else {

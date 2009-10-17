@@ -22,7 +22,7 @@ use constant {
 };
 
 BEGIN {
-	$VERSION = '3.1.5';
+	$VERSION = '3.2';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	if( ! $PAB3::CGI::VERSION ) {
@@ -46,11 +46,17 @@ sub import {
 		return;
 	}
 	foreach( @_ ) {
-		if( $_ eq ':const' ) {
+		if( $_ eq ':const' || $_ eq ':default' ) {
 			*{$callpkg . '::PAB_SCALAR'} = \&{$pkg . '::SCALAR'};
 			*{$callpkg . '::PAB_ARRAY'} = \&{$pkg . '::ARRAY'};
 			*{$callpkg . '::PAB_HASH'} = \&{$pkg . '::HASH'};
 			*{$callpkg . '::PAB_FUNC'} = \&{$pkg . '::FUNC'};
+		}
+		if( $_ eq ':default' ) {
+			*{$callpkg . '::print_var'} = \&{$pkg . '::print_var'};
+			*{$callpkg . '::print_r'} = \&{$pkg . '::print_var'};
+			*{$callpkg . '::require'} = \&{$pkg . '::require'};
+			*{$callpkg . '::require_and_run'} = \&{$pkg . '::require_and_run'};
 		}
 	}
 }
@@ -473,7 +479,7 @@ PAB3 - Perl Application Builder / Version 3
 
 =head1 DESCRIPTION
 
-C<PAB3> provides a framework for building rapid applications in Perl5.
+C<PAB3> provides a framework for building rapid applications with Perl.
 It includes a template handler for producing output. This part
 is defined here.
 
@@ -504,7 +510,7 @@ over the %ENV variable and prints the output to STDOUT.
   <* PRINT "[$_] => " . $ENV{$_} . "\n" *>
   <* END LOOP *>
   
-  # or - unregistered
+  # or - with loop directive
   
   <* loop foreach( keys %ENV ) *>
   <* = "[$_] => " . $ENV{$_} . "\n" *>
@@ -515,6 +521,10 @@ over the %ENV variable and prints the output to STDOUT.
   <* foreach( keys %ENV ) { *>
   <* print "[$_] => " . $ENV{$_} . "\n" *>
   <* } *>
+  
+  # or - with internal function
+  
+  <* &PAB3::print_r( \%ENV ) *>
 
 
 =head1 METHODS
@@ -830,7 +840,7 @@ L<directive LOOP|PAB3/LOOP>.
 
 =item add_hashmap ( $loop_id, $hashname, $fieldmap )
 
-=item add_hashmap ( $loop_id, $hashname, $fieldmap, $hm_save )
+=item add_hashmap ( $loop_id, $hashname, $fieldmap, $fm_save )
 
 Add a hashmap to the parser.
 Hashmaps are designed to translate hashes in templates into arrays in the
@@ -844,7 +854,7 @@ B<Parameters>
 I<$loop_id>
 
 If it is defined only the program sequences inside the loop will be converted,
-otherwise the complete template is will be converted.
+otherwise the complete template is used.
 
 I<$hashname>
 
@@ -856,7 +866,7 @@ Can be a reference to an array of fieldnames or a
 reference to a hash containing fieldnames as keys and the assiocated indices
 as values.
 
-I<$hm_save>
+I<$fm_save>
 
 If $fieldmap is an arrayref, the new generated hashmap can be saved in this
 parameter.
@@ -954,7 +964,7 @@ These parameters can be overwritten by L<new()|PAB3/new>.
   <p><* PRINT localtime *></p>
   
   <*
-      my $pos = int( rand( 3 ) );;
+      my $pos = int( rand( 3 ) );
       my @text =
           (
               'I wish you a nice day.',
@@ -1003,7 +1013,7 @@ Example:
   <* = 'Or formated: ' . &PAB3::Utils::strftime( '%c', time ) *>
 
 
-B<Performance info> Combining multiple expressions into one string can speed
+B<Performance notice:> Combining multiple expressions into one string can speed
 up the print process.
 For example:
 
@@ -1055,11 +1065,19 @@ Enclosed block is processed if the E<lt>conditionE<gt> is true.
   ...
   <* END IF            *>
 
+Example:
+
+  <* if ( $rowpos % 2 ) == 0 *>
+  <tr class="even">
+  <* else *>
+  <tr class="odd">
+  <* end if *>
+
 
 =item INCLUDE   E<lt>templateE<gt>
 
 Process another template file.
-Please note the "class_name" at L<new()|PAB3/new>.
+Please note to "class_name" at L<new()|PAB3/new>.
 
   <* INCLUDE <expression> *>
 
@@ -1100,13 +1118,13 @@ the template.
   ...
   <* END LOOP                    *>
 
-B<Example of an ARRAY loop>
+B<Example of a predefined ARRAY loop>
 
   <* LOOP ARRAY @INC $_ *>
   <*   PRINT $_ . "\n" *>
   <* END LOOP *>
 
-B<Example of a HASH loop>
+B<Example of a predefined HASH loop>
 
   <* LOOP HASH %ENV $_ *>
   <*   PRINT $_ . ' = ' . $ENV{$_} . "\n" *>
@@ -1121,9 +1139,9 @@ B<Example of a registered loop>
   $pab = PAB3->new( ... );
   
   @data = (
-      [ 'Smith', 'John', 33 ],
-      [ 'Thomson', 'Peggy', 45 ],
-      [ 'Johanson', 'Gustav', 27 ],
+      { 'Name' => 'Smith',    'Prename' => 'John',   'Age' => 33 },
+      { 'Name' => 'Thomson',  'Prename' => 'Peggy',  'Age' => 45 },
+      { 'Name' => 'Johanson', 'Prename' => 'Gustav', 'Age' => 27 },
   );
   
   $pab->register_loop(
@@ -1158,7 +1176,7 @@ B<Example of a registered loop with hashmap>
   $pab->register_loop(
        'PERSON', 'data' => PAB_ARRAY, 'per' => PAB_ARRAY
   );
-  $pab->add_hashmap( 'Person', 'per', \@fields );
+  $pab->add_hashmap( 'PERSON', 'per', \@fields );
   
   $pab->make_script_and_run( 'template' );
 
@@ -1189,7 +1207,7 @@ B<Example of unregistered loops>
   );
   @fields = ( 'Name', 'Prename', 'Age' );
   
-  $pab->add_hashmap( 'PersonMapped', 'per', \@fields );
+  $pab->add_hashmap( 'PERSON_MAPPED', 'per', \@fields );
   
   $pab->make_script_and_run( 'template' );
 
@@ -1201,12 +1219,12 @@ B<Example of unregistered loops>
   <* END LOOP *>
   
   # with id
-  <* LOOP Person foreach $per( @h_data ) *>
+  <* LOOP PERSON foreach $per( @h_data ) *>
   <* = $per->{'Prename'} . ' ' . $per->{'Name'} *> is <* = $per->{'Age'} *> years old
-  <* END LOOP Person *>
+  <* END LOOP PERSON *>
   
   # with hashmap
-  <* LOOP PersonMapped foreach $per (@a_data) *>
+  <* LOOP PERSON_MAPPED foreach $per (@a_data) *>
   <* = $per->{'Prename'} . ' ' . $per->{'Name'} *> is <* = $per->{'Age'} *> years old
   <* END LOOP *>
 
@@ -1270,8 +1288,9 @@ Example:
 
 =head1 EXPORTS
 
-By default nothing is exported. To export constants like PAB_SCALAR etc use
-the export tag ":const"
+By default nothing is exported. To export constants like PAB_SCALAR, etc use
+the export tag ":const". To export functions and constants use the export tag
+":default".
 
 =head1 AUTHORS
 

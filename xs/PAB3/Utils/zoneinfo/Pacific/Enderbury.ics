@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Pacific/Enderbury
+TZID:/navalla.org/20071203_1/Pacific/Enderbury
 X-LIC-LOCATION:Pacific/Enderbury
 BEGIN:STANDARD
 TZOFFSETFROM:+1300

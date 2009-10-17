@@ -2,7 +2,6 @@
 #include <perl.h>
 #include <XSUB.h>
 
-//#include <math.h>
 #include <stdlib.h>
 
 #include "my_pab3.h"
@@ -14,6 +13,20 @@ BOOT:
 	MY_CXT_INIT;
 	MY_CXT.first_thread = MY_CXT.last_thread = NULL;
 }
+
+#/*****************************************************************************
+# * CLONE( ... )
+# *****************************************************************************/
+
+#if defined(USE_ITHREADS) && defined(MY_CXT_KEY)
+
+void
+CLONE( ... )
+CODE:
+	MY_CXT_CLONE;
+
+#endif
+
 
 #/*****************************************************************************
 # * _new( class, ... )
@@ -36,7 +49,7 @@ PPCODE:
 	for( itemp = 1; itemp < items - 1; itemp += 2 ) {
 		if( ! SvPOK( ST(itemp) ) ) continue;
 		key = SvPVx( ST(itemp), lkey );
-		//printf( "item %u %s\n", itemp, key );
+		/*printf( "item %u %s\n", itemp, key );*/
 		if( strcmp( key, "path_template" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
 			New( 1, tv->path_template, lval + 2, char );
@@ -44,7 +57,7 @@ PPCODE:
 			if( tv->path_template[lval - 1] != '/' )
 				tv->path_template[lval ++] = '/';
 			tv->path_template[lval] = '\0';
-			tv->path_template_length = lval;
+			tv->path_template_length = (WORD) lval;
 		}
 		else if( strcmp( key, "path_cache" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
@@ -53,32 +66,32 @@ PPCODE:
 			if( tv->path_cache[lval - 1] != '/' )
 				tv->path_cache[lval ++] = '/';
 			tv->path_cache[lval] = '\0';
-			tv->path_cache_length = lval;
+			tv->path_cache_length = (WORD) lval;
 		}
 		else if( strcmp( key, "prg_start" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
 			New( 1, tv->prg_start, lval + 1, char );
 			Copy( val, tv->prg_start, lval + 1, char );
-			tv->prg_start_length = lval;
+			tv->prg_start_length = (BYTE) lval;
 		}
 		else if( strcmp( key, "prg_end" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
 			New( 1, tv->prg_end, lval + 1, char );
 			Copy( val, tv->prg_end, lval + 1, char );
-			tv->prg_start_length = lval;
+			tv->prg_start_length = (BYTE) lval;
 		}
 		else if( strcmp( key, "cmd_sep" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
 			New( 1, tv->cmd_sep, lval + 1, char );
 			Copy( val, tv->cmd_sep, lval + 1, char );
-			tv->cmd_sep_length = lval;
+			tv->cmd_sep_length = (BYTE) lval;
 		}
 		else if( strcmp( key, "class_name" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
 			New( 1, tv->class_name, lval + 5, char );
 			Copy( val, tv->class_name, lval + 1, char );
 			set_var_str( tv->class_name, &lval, PAB_TYPE_SCALAR );
-			tv->class_name_length = lval;
+			tv->class_name_length = (WORD) lval;
 		}
 		else if( strcmp( key, "default_record" ) == 0 ) {
 			val = SvPVx( ST(itemp + 1), lval );
@@ -90,7 +103,7 @@ PPCODE:
 			}
 			New( 1, tv->default_record, lval + 5, char );
 			Copy( val, tv->default_record, lval + 1, char );
-			tv->default_record_length = lval;
+			tv->default_record_length = (WORD) lval;
 		}
 	}
 	hv = gv_stashpv( __PACKAGE__, 0 );
@@ -164,9 +177,10 @@ PREINIT:
 	STRLEN ltmp, ltpl;
 	char *tmp, *p1;
 	char tpl[256], cac[256];
-	//PerlIO *pfile;
+	/*PerlIO *pfile;*/
 PPCODE:
-	if( ( tv = my_thread_var_find( &MY_CXT, this ) ) == NULL ) goto ferror;
+	if( (tv = my_thread_var_find( &MY_CXT, this )) == NULL )
+		goto ferror;
 	tv->last_error[0] = '\0';
 	tmp = SvPVx( template, ltpl );
 	if( ltpl + tv->path_template_length < 256 ) {
@@ -189,10 +203,13 @@ PPCODE:
 			cac[0] = '\0';
 	}
 parse:	
-	if( ! parse_template( tv, tpl, ltpl, 0 ) ) goto error;
+	if( ! parse_template( tv, tpl, ltpl, 0 ) )
+		goto error;
 	optimize_script( tv, tv->root_item );
-	if( ! map_parsed( tv, tv->root_item, 0 ) ) goto error;
-	if( ! build_script( tv ) ) goto error;
+	if( ! map_parsed( tv, tv->root_item, 0 ) )
+		goto error;
+	if( ! build_script( tv ) )
+		goto error;
 	if( cac[0] == '\0' ) {
 		XPUSHs( sv_2mortal( newSVuv( 2 ) ) );
 		XPUSHs( sv_2mortal( newSVpvn(
@@ -270,7 +287,8 @@ CODE:
 		}
 		else {
 			Safefree( ld->record );
-			ld->record = NULL, ld->record_type = ld->record_length = 0;
+			ld->record = NULL;
+			ld->record_type = 0, ld->record_length = 0;
 		}
 		if( object != NULL && SvOK( object ) ) {
 			str1 = SvPVx( object, len1 );
@@ -394,7 +412,7 @@ CODE:
 			s1 = hv_iterkey( he, &l2 );
 			sv = hv_iterval( hv, he );
 			if( ! SvOK( sv ) || ! SvIOK( sv ) ) goto error_fm;
-			i = SvIV( sv );
+			i = (int) SvIV( sv );
 			if( i < 0 || i >= len ) goto error_fm;
 			New( 1, hd->fields[i], l2 + 1, char );
 			Copy( s1, hd->fields[i], l2 + 1, char );

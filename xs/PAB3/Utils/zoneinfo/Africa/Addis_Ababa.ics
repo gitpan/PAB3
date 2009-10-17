@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Africa/Addis_Ababa
+TZID:/navalla.org/20071203_1/Africa/Addis_Ababa
 X-LIC-LOCATION:Africa/Addis_Ababa
 BEGIN:STANDARD
 TZOFFSETFROM:+0300

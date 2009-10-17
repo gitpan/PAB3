@@ -7,7 +7,7 @@ package PAB3::Output::CGI;
 use strict;
 no strict 'refs';
 use warnings;
-no warnings 'untie';
+no warnings 'untie', 'uninitialized';
 
 use vars qw($VERSION);
 
@@ -78,7 +78,7 @@ sub SENDHEADER {
 	$needct = 1;
 	if( $GLOBAL::MODPERL ) {
 		foreach $key( keys %PAB3::CGI::HEAD ) {
-			$needct = 0 if $needct && ( $key eq 'content-type' || 'location' );
+			$needct = 0 if $needct && ($key eq 'content-type' || $key eq 'location');
 			if( ref( $PAB3::CGI::HEAD{$key} ) ) {
 				foreach $val( @{$PAB3::CGI::HEAD{$key}} ) {
 					$ret = &HEADER_MODPERL( $key, $val );
@@ -104,7 +104,7 @@ sub SENDHEADER {
 			delete $PAB3::CGI::HEAD{'status'};
 		}
 		foreach $key( keys %PAB3::CGI::HEAD ) {
-			$needct = 0 if $needct && ( $key eq 'content-type' || 'location' );
+			$needct = 0 if $needct && ($key eq 'content-type' || $key eq 'location');
 			if( ref( $PAB3::CGI::HEAD{$key} ) ) {
 				foreach( @{$PAB3::CGI::HEAD{$key}} ) {
 		    		print $key . ': ' . $_ . "\015\012";

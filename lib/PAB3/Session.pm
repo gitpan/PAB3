@@ -14,12 +14,12 @@ no strict 'refs';
 use vars qw($VERSION $SID %_SESSION %Config $DefaultPath);
 
 BEGIN {
-	$VERSION = '1.0.6';
+	$VERSION = '1.0.7';
 	if( ! $GLOBAL::MODPERL ) {
 		$GLOBAL::MODPERL = 0;
 		$GLOBAL::MODPERL = 2 if exists $ENV{'MOD_PERL_API_VERSION'}
 			&& $ENV{'MOD_PERL_API_VERSION'} == 2;
-		$GLOBAL::MODPERL = 1 ! if $GLOBAL::MODPERL
+		$GLOBAL::MODPERL = 1 if ! $GLOBAL::MODPERL
 			&& defined $Apache::VERSION
 			&& $Apache::VERSION > 1 && $Apache::VERSION < 1.99;
 	}
@@ -89,7 +89,7 @@ sub start {
 		'save_path' => $DefaultPath,
 		'name' => 'PABSESSID',
 		'gc_max_lifetime' => 1440,
-		'gc_probality' => 1,
+		'gc_probality' => 10,
 		'gc_divisor' => 100,
 		'use_cookies' => 1,
 		'use_only_cookies' => 0,
@@ -139,7 +139,7 @@ sub start {
 		}
 	}
 	if( $PAB3::CGI::VERSION && $Config{'use_cookies'} ) {
-		&PAB3::CGI::setCookie(
+		&PAB3::CGI::setcookie(
 			$Config{'name'},
 			$SID,
 			$Config{'cookie_lifetime'}

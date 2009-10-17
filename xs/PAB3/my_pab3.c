@@ -1,12 +1,3 @@
-#include <EXTERN.h>
-#include <perl.h>
-#include <XSUB.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-#include <stdarg.h>
-
 #include "my_pab3.h"
 
 struct st_refbuf {
@@ -40,7 +31,7 @@ void _refbuf_rem( struct st_refbuf *rb ) {
 	}
 }
 
-char *my_strncpy( char *dst, const char *src, unsigned long len ) {
+char *my_strncpy( char *dst, const char *src, size_t len ) {
 	char ch;
 	for( ; len > 0; len -- ) {
 		if( ( ch = *src ++ ) == '\0' ) {
@@ -80,7 +71,7 @@ char *_my_strcpy_dbg( char *dst, const char *src, const char *file, int line ) {
 }
 #endif
 
-char *my_strncpyu( char *dst, const char *src, unsigned long len ) {
+char *my_strncpyu( char *dst, const char *src, size_t len ) {
 	char ch;
 	for( ; len > 0; len -- ) {
 		if( ( ch = *src ++ ) == '\0' ) {
@@ -109,7 +100,7 @@ int my_stricmp( const char *cs, const char *ct ) {
  ***********************************************/
 const char *my_stristr( const char *str, const char *pattern ) {
 	const char *pptr, *sptr, *start;
-	DWORD slen, plen;
+	size_t slen, plen;
 
 	for( start = str,
 		pptr  = pattern,
@@ -153,8 +144,8 @@ char *my_strrev( char *str, size_t len ) {
 	return str;
 }
 
-char *my_itoa( char *str, int value, int radix ) {
-	int rem;
+char *my_itoa( char *str, long value, int radix ) {
+	long rem;
 	char *ret = str;
 	switch( radix ) {
 	case 16:
@@ -208,7 +199,7 @@ char *str_replace( out, lout, str, lstr, search, lsch, replace, lrep )
 	const char *replace;
 	size_t lrep;
 {
-	unsigned long istr, isch, irep, lmax;
+	size_t istr, isch, irep, lmax;
 	char *sz = NULL;
 	if( str == NULL ) return NULL;
 	if( search == NULL || replace == NULL ) {
@@ -249,7 +240,7 @@ char *str_replace( out, lout, str, lstr, search, lsch, replace, lrep )
 
 my_thread_var_t *my_thread_var_add( my_cxt_t *cxt, SV *sv ) {
 	my_thread_var_t *tv;
-	New( 1, tv, 1, my_thread_var_t );
+	Newx( tv, 1, my_thread_var_t );
 	Copy( &THREADVAR_DEFAULT, tv, 1, my_thread_var_t );
 	tv->id = sv;
 	if( cxt->first_thread == NULL )
@@ -446,7 +437,7 @@ void my_parser_item_cleanup( my_thread_var_t *tv ) {
 
 void set_var_str( char *str, size_t *str_len, char type ) {
 	char *p1, *p2;
-	DWORD d1;
+	size_t d1;
 	switch( type ) {
 	case PAB_TYPE_NONE:
 		//printf( "none (%d)[%s]\n", *str_len, str );
@@ -740,7 +731,8 @@ int build_script_int( my_thread_var_t *tv, my_parser_item_t *parent, DWORD level
 			tv->parser.curout = my_strcpy( tv->parser.curout, "if( " );
 			tv->parser.curout = my_strcpy( tv->parser.curout, pi->content );
 			tv->parser.curout = my_strcpy( tv->parser.curout, " ) {\n" );
-			if( ! build_script_int( tv, pi, level + 1 ) ) return 0;
+			if( pi->child != NULL )
+				if( ! build_script_int( tv, pi, level + 1 ) ) return 0;
 			break;
 		case PARSER_ITEM_ELCO:
 			if( pi->next == NULL || pi->next->id < PARSER_ITEM_ELCO
@@ -755,7 +747,8 @@ int build_script_int( my_thread_var_t *tv, my_parser_item_t *parent, DWORD level
 			tv->parser.curout = my_strcpy( tv->parser.curout, "elsif( " );
 			tv->parser.curout = my_strcpy( tv->parser.curout, pi->content );
 			tv->parser.curout = my_strcpy( tv->parser.curout, " ) {\n" );
-			if( ! build_script_int( tv, pi, level + 1 ) ) return 0;
+			if( pi->child != NULL )
+				if( ! build_script_int( tv, pi, level + 1 ) ) return 0;
 			break;
 		case PARSER_ITEM_ELSE:
 			if( pi->next == NULL || pi->next->id != PARSER_ITEM_ECON )
@@ -767,7 +760,8 @@ int build_script_int( my_thread_var_t *tv, my_parser_item_t *parent, DWORD level
 			tv->parser.curout = my_strcpy( tv->parser.curout, "}\n" );
 			for( i = level; i > 0; i -- ) *(tv->parser.curout ++) = '\t';
 			tv->parser.curout = my_strcpy( tv->parser.curout, "else {\n" );
-			if( ! build_script_int( tv, pi, level + 1 ) ) return 0;
+			if( pi->child != NULL )
+				if( ! build_script_int( tv, pi, level + 1 ) ) return 0;
 			break;
 		case PARSER_ITEM_ECON:
 			OUTPUT_ENSURE( tv, 10 + level );
@@ -1175,32 +1169,33 @@ int build_script( my_thread_var_t *tv ) {
 	return 1;
 }
 
-int map_hash( tv, parent, hd, rtype )
-my_thread_var_t *tv;
-my_parser_item_t *parent;
-my_hashmap_def_t *hd;
-char rtype;
-{
+int map_hash(
+	my_thread_var_t *tv, my_parser_item_t *parent, my_hashmap_def_t *hd,
+	char rtype
+) {
 	my_parser_item_t *pi;
 	char *p1, *p2, *p3, *p4, *pk1, *str = NULL;
-	size_t len = 0, pos = 0, resize, i;
+	size_t len = 0, pos, resize;
+	DWORD i;
 	int ret;
 	for( pi = parent->child; pi != NULL; pi = pi->next ) {
-		if( pi->content == NULL ) goto mh_next;
+		if( pi->content == NULL )
+			goto mh_next;
+		pos = 0;
 		p1 = pi->content;
 		p4 = p1 + pi->content_length + 1;
-		while( ( p2 = strstr( p1, hd->record ) ) != NULL ) {
+		while( (p2 = strstr( p1, hd->record )) != NULL ) {
 			resize = MAX(
 				MAX( pi->content_length - len, 0 ),
 				len - pos + hd->record_length + 20
 			);
 			if( resize > len ) {
 				len += resize + 1024;
-				Renew( str, len, char );
+				Renew( str, len + 40, char );
 			}
 			if( p1 < p2 ) {
-				Copy( p1, &str[pos], p2 - p1, char );
-				pos += ( p2 - p1 );
+				Copy( p1, str + pos, p2 - p1, char );
+				pos += (p2 - p1);
 			}
 			p2 += hd->record_length;
 			if( rtype == PAB_TYPE_SCALAR || rtype == PAB_TYPE_AUTO ) {
@@ -1209,12 +1204,14 @@ char rtype;
 				if( p3 >= p4 || *p3 ++ != '-' ) goto mh_cont1;
 				if( p3 >= p4 || *p3 ++ != '>' ) goto mh_cont1;
 				if( p3 >= p4 || *p3 ++ != '{' ) goto mh_cont1;
-				if( p3 < p4 && ( *p3 == '\'' || *p3 == '"' ) ) p3 ++;
+				if( p3 < p4 && (*p3 == '\'' || *p3 == '"') ) p3 ++;
 				pk1 = p3;
-				while( p3 < p4 && *p3 != '\'' && *p3 != '"' && *p3 != '}' ) p3 ++;
-				if( p3 == pk1 ) goto mh_cont1;
+				for( ; p3 < p4 && *p3 != '\'' && *p3 != '"' && *p3 != '}'; p3 ++ );
+				if( p3 == pk1 )
+					goto mh_cont1;
 				*p3 = '\0';
-				if( p3 < p4 && ( *p3 != '}' ) ) p3 ++;
+				if( p3 < p4 && *p3 != '}' )
+					p3 ++;
 				for( i = 0; i < hd->field_count; i ++ )
 					if( strcmp( hd->fields[i], pk1 ) == 0 )
 						goto mh_found1;
@@ -1237,14 +1234,19 @@ mh_cont1:
 			if( rtype == PAB_TYPE_ARRAY || rtype == PAB_TYPE_AUTO ) {
 				// $record{'key'} => $record[num]
 				p3 = p2;
-				if( p3 >= p4 || *p3 ++ != '{' ) goto mh_cont2;
-				if( p3 < p4 && ( *p3 == '\'' || *p3 == '"' ) ) p3 ++;
-				if( p3 < p4 && ( *p3 == '\'' || *p3 == '"' ) ) p3 ++;
+				if( p3 >= p4 || *p3 ++ != '{' )
+					goto mh_cont2;
+				if( p3 < p4 && ( *p3 == '\'' || *p3 == '"' ) )
+					p3 ++;
+				if( p3 < p4 && ( *p3 == '\'' || *p3 == '"' ) )
+					p3 ++;
 				pk1 = p3;
-				while( p3 < p4 && *p3 != '\'' && *p3 != '"' && *p3 != '}' ) p3 ++;
-				if( p3 == pk1 ) goto mh_cont2;
+				for( ; p3 < p4 && *p3 != '\'' && *p3 != '"' && *p3 != '}'; p3 ++ );
+				if( p3 == pk1 )
+					goto mh_cont2;
 				*p3 = '\0';
-				if( p3 < p4 && ( *p3 != '}' ) ) p3 ++;
+				if( p3 < p4 && *p3 != '}' )
+					p3 ++;
 				for( i = 0; i < hd->field_count; i ++ )
 					if( strcmp( hd->fields[i], pk1 ) == 0 )
 						goto mh_found2;
@@ -1255,8 +1257,8 @@ mh_found2:
 				Copy( hd->record, &str[pos], hd->record_length, char );
 				pos += hd->record_length;
 				str[pos ++] = '[';
-				p2 = my_itoa( &str[pos], i, 10 );
-				pos += ( p2 - &str[pos] );
+				p2 = my_itoa( str + pos, (long) i, 10 );
+				pos += (p2 - str + pos);
 				str[pos ++] = ']';
 				p1 = p3 + 1;
 				goto mh_cont3;
@@ -1270,18 +1272,19 @@ mh_cont3:
 		}
 		if( p1 > pi->content ) {
 			if( p1 < p4 ) {
-				Copy( p1, &str[pos], p4 - p1, char );
-				pos += ( p4 - p1 );
+				Copy( p1, str + pos, p4 - p1, char );
+				pos += (p4 - p1);
 			}
 			str[pos] = '\0';
 			Renew( pi->content, pos + 1, char );
 			Copy( str, pi->content, pos + 1, char );
 			pi->content_length = pos;
-			_debug( "mapped string [%s]\n", str );
+			_debug( "mapped string [%s]\n", pi->content );
 		}
 mh_next:
 		if( pi->child != NULL )
-			if( ! map_hash( tv, pi, hd, rtype ) ) goto error;
+			if( ! map_hash( tv, pi, hd, rtype ) )
+				goto error;
 	}
 	ret = 1;
 	goto exit;
@@ -1300,43 +1303,52 @@ int map_parsed( my_thread_var_t *tv, my_parser_item_t *parent, int level ) {
 		// map global hashes
 		for( hd = tv->first_hm; hd != NULL; hd = hd->next ) {
 			if( hd->loopid == NULL ) {
-				if( ! map_hash( tv, parent, hd, PAB_TYPE_SCALAR ) ) return 0;
+				if( ! map_hash( tv, parent, hd, PAB_TYPE_SCALAR ) )
+					return 0;
 			}
 		}
 	}
 	for( pi = parent->child; pi != NULL; pi = pi->next ) {
 		if( pi->id == PARSER_ITEM_LOOP ) {
 			for( hd = tv->first_hm; hd != NULL; hd = hd->next ) {
-				if( hd->loopid == NULL ) continue;
-				if( my_stricmp( hd->loopid, pi->content ) != 0 ) continue;
+				if( hd->loopid == NULL )
+					continue;
+				if( my_stricmp( hd->loopid, pi->content ) != 0 )
+					continue;
 				ld = my_loop_def_find_by_id( tv, hd->loopid );
 				if( ! map_hash( tv, pi, hd, ld ? ld->record_type : PAB_TYPE_AUTO ) )
 					return 0;
 			}
 		}
 		if( pi->child != NULL )
-			if( ! map_parsed( tv, pi, level + 1 ) ) return 0;
+			if( ! map_parsed( tv, pi, level + 1 ) )
+				return 0;
 	}
 	return 1;
 }
 
 #define ADD_ITEM(tv,item) \
-	if( *((tv)->parser.ppi) == NULL ) *((tv)->parser.ppi) = (item); \
-	if( (item)->parent->child_last ) (item)->parent->child_last->next = (item); \
+{ \
+	if( *((tv)->parser.ppi) == NULL ) \
+		*((tv)->parser.ppi) = (item); \
+	if( (item)->parent->child_last ) \
+		(item)->parent->child_last->next = (item); \
 	(item)->parent->child_last = (item); \
-	(item)->row = (tv)->parser.row
+	(item)->row = (tv)->parser.row; \
+}
 
 int add_template_item_text( my_thread_var_t *tv, char *str, size_t len ) {
 	my_parser_item_t *item;
-	Newz( 1, item, 1, my_parser_item_t );
+	Newxz( item, 1, my_parser_item_t );
 	item->id = PARSER_ITEM_TEXT;
 	item->content_length = len;
-	New( 1, item->content, item->content_length + 1, char );
-	Copy( str, item->content, item->content_length + 1, char );
+	Newx( item->content, len + 1, char );
+	Copy( str, item->content, len, char );
+	item->content[len] = '\0';
 	item->parent = tv->parser.last_parent;
 	ADD_ITEM( tv, item );
 	_debug( "TEXT %u [%s] item 0x%08X parent 0x%08X\n",
-		len, str, item, item->parent );
+		len, item->content, item, item->parent );
 	return 1;
 }
 
@@ -1346,15 +1358,15 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 	p1 = str;
 	p2 = str + len;
 	while( ! ISWHITECHAR( *p1 ) && p1 < p2 ) p1 ++;
-	New( 1, key, p1 - str + 1, char );
+	Newx( key, p1 - str + 1, char );
 	my_strncpyu( key, str, p1 - str );
 	while( ISWHITECHAR( *p1 ) && p1 < p2 ) p1 ++;
-	Newz( 1, item, 1, my_parser_item_t );
+	Newxz( item, 1, my_parser_item_t );
 	switch( *key ++ ) {
 	case '=':
 		item->id = PARSER_ITEM_PRINT;
 		item->content_length = p2 - p1;
-		New( 1, item->content, item->content_length + 1, char );
+		Newx( item->content, item->content_length + 1, char );
 		Copy( p1, item->content, item->content_length + 1, char );
 		item->parent = tv->parser.last_parent;
 		ADD_ITEM( tv, item );
@@ -1366,7 +1378,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 		if( strcmp( key, "RINT" ) == 0 ) {
 			item->id = PARSER_ITEM_PRINT;
 			item->content_length = p2 - p1;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			Copy( p1, item->content, item->content_length + 1, char );
 			item->parent = tv->parser.last_parent;
 			ADD_ITEM( tv, item );
@@ -1381,7 +1393,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 		if( *key == 'F' ) {
 			item->id = PARSER_ITEM_CON;
 			item->content_length = p2 - p1;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			Copy( p1, item->content, item->content_length + 1, char );
 			item->parent = tv->parser.last_parent;
 			ADD_ITEM( tv, item );
@@ -1394,7 +1406,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 		else if( strcmp( key, "NCLUDE" ) == 0 ) {
 			item->id = PARSER_ITEM_ASIS;
 			item->content_length = ( p2 - p1 ) * 2 + tv->class_name_length + 200;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			p3 = my_strcpy( item->content, tv->class_name );
 			p3 = my_strcpy( p3, "->make_script_and_run( \"" );
 			p3 = my_strcpy( p3, p1 );
@@ -1510,7 +1522,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 					return my_parser_set_error( tv,
 						"[ELSIF] outside condition" );
 			item->content_length = p2 - p1;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			Copy( p1, item->content, item->content_length + 1, char );
 			item->parent = tv->parser.last_parent->parent;
 			ADD_ITEM( tv, item );
@@ -1529,7 +1541,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			for( p3 = p1; p3 < p2 && ! ISWHITECHAR( *p3 ); p3 ++ );
 			if( p3 < p2 ) *p3 ++ = '\0';
 			item->content_length = p3 - p1;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			Copy( p1, item->content, item->content_length + 1, char );
 			while( p3 < p2 && ISWHITECHAR( *p3 ) ) p3 ++;
 			p1 = p3;
@@ -1537,12 +1549,12 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			if( p3 < p2 ) *p3 = '\0';
 			if( p1 < p3 ) {
 				item->len1 = p3 - p1;
-				New( 1, item->val1, item->len1 + 5, char );
+				Newx( item->val1, item->len1 + 5, char );
 				Copy( p1, item->val1, item->len1 + 1, char );
 				while( p3 < p2 && ISWHITECHAR( *p3 ) ) p3 ++;
 				if( p3 < p2 ) {
 					item->len2 = p2 - p3;
-					New( 1, item->val2, item->len2 + 5, char );
+					Newx( item->val2, item->len2 + 5, char );
 					Copy( p3, item->val2, item->len2 + 1, char );
 				}
 			}
@@ -1561,7 +1573,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 		if( strcmp( key, "UB" ) == 0 ) {
 			item->id = PARSER_ITEM_SUB;
 			item->content_length = p2 - p1;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			Copy( p1, item->content, item->content_length + 1, char );
 			item->parent = tv->parser.last_parent;
 			ADD_ITEM( tv, item );
@@ -1577,7 +1589,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 	case '#':
 		item->id = PARSER_ITEM_COMMENT;
 		item->content_length = p2 - p1;
-		New( 1, item->content, item->content_length + 1, char );
+		Newx( item->content, item->content_length + 1, char );
 		Copy( p1, item->content, item->content_length + 1, char );
 		item->parent = tv->parser.last_parent;
 		ADD_ITEM( tv, item );
@@ -1590,7 +1602,7 @@ int add_template_item( my_thread_var_t *tv, char *str, size_t len, char *rlb ) {
 			_debug( "!X [%s]\n", p1 );
 			item->id = PARSER_ITEM_XX;
 			item->content_length = p2 - p1;
-			New( 1, item->content, item->content_length + 1, char );
+			Newx( item->content, item->content_length + 1, char );
 			Copy( p1, item->content, item->content_length + 1, char );
 			item->parent = tv->parser.last_parent;
 			ADD_ITEM( tv, item );
@@ -1606,7 +1618,7 @@ default_action:
 		_debug( "DO [%s]\n", str );
 		item->id = PARSER_ITEM_DO;
 		item->content_length = p2 - str;
-		New( 1, item->content, item->content_length + 1, char );
+		Newx( item->content, item->content_length + 1, char );
 		Copy( str, item->content, item->content_length + 1, char );
 		item->parent = tv->parser.last_parent;
 		ADD_ITEM( tv, item );
@@ -1616,163 +1628,151 @@ default_action:
 	return 1;
 }
 
-#define template_getc(tpl,etpl,pfile,type) \
-	( (type) == 1 ? PerlIO_getc( (pfile) ) : ( tpl < etpl ? *tpl ++ : -1 ) )
-
-int parse_template( my_thread_var_t *tv, const char *tpl, size_t len, int setpath ) {
-	PerlIO *pfile;
-	int step = 0, ch, spos = 0, sp2 = 0, lstr = 0, lpos = 0, i;
-	char *str = NULL, *p1, *p2, rlb = 0, type = 1, *path = NULL;
-	const char *etpl = tpl + len;
-	Newz( 1, tv->root_item, 1, my_parser_item_t );
+int parse_template( my_thread_var_t *tv, const char *tpl, int len, int setpath ) {
+	PerlIO *pfile = NULL;
+	int step = 0, ret = 0;
+	char *path = NULL, *buf, rlb = 0, *s1, *s2, *s3, *bufe;
+	const char *prgsb, *prgsf, *prgsp, *prgeb, *prgef, *prgep, *cmdsb, *cmdse, *cmdsp;
+	Newxz( tv->root_item, 1, my_parser_item_t );
 	tv->parser.last_parent = tv->root_item;
 	tv->parser.ppi = &tv->root_item->child;
 	_debug( "creating item 0x%07X parent 0x%07X\n",
 		tv->root_item, tv->root_item->parent );
 	if( len <= 256 ) {
 		if( setpath && tv->path_template != NULL ) {
-			New( 1, path, tv->path_template_length + len + 1, char );
-			p1 = my_strcpy( path, tv->path_template );
-			etpl = my_strcpy( p1, tpl );
+			Newx( path, tv->path_template_length + len + 1, char );
+			len = my_strcpy( my_strcpy( path, tv->path_template ), tpl ) - path;
 			tpl = path;
 			pfile = PerlIO_open( path, "r" );
 		}
 		else
 			pfile = PerlIO_open( tpl, "r" );
-		if( ! pfile )
-			type = 2;
 	}
-	if( type == 2 )
-		my_strcpy( tv->parser.file, "ANON" );
-	else
+	if( pfile != NULL ) {
+		PerlIO_seek( pfile, 0, SEEK_END );
+		len = PerlIO_tell( pfile );
+		PerlIO_seek( pfile, 0, SEEK_SET );
+		Newx( buf, len + 1, char );
+		len = PerlIO_read( pfile, buf, len );
+		buf[len] = '\0';
+		PerlIO_close( pfile );
 		my_strncpy( tv->parser.file, tpl, sizeof( tv->parser.file ) );
-	tv->parser.column = 0;
-	tv->parser.row = 1;
-	while( ( ch = template_getc( tpl, etpl, pfile, type ) ) != -1 ) {
-		if( ch == '\n' ) {
-			tv->parser.row ++;
-			tv->parser.column = 1;
-		}
-		else if( ch == '\r' ) {
-			continue;
-		}
-		else {
-			tv->parser.column ++;
-		}
-		if( lpos >= lstr - spos ) {
-			lstr += 1024;
-			str = realloc( str, lstr + 1 );
-			p1 = str + lpos;
-		}
-		switch( step ) {
-		case 0:
-			if( ch == tv->prg_start[spos] ) {
-				if( ++ spos == tv->prg_start_length ) {
-					p2 = str;
-					if( rlb ) {
-						if( *p2 == 13 && p2 <= p1 ) p2 ++;
-						if( *p2 == 10 && p2 <= p1 ) p2 ++;
-					}
-					if( p1 > p2 ) {
-						*p1 = '\0';
-						if( ! add_template_item_text( tv, p2, p1 - p2 ) )
-							goto error;
-						p1 = str;
-						rlb = lpos = 0;
-					}
-					step = 1;
-					sp2 = spos = 0;
-				}
-			}
-			else {
-				for( i = 0; i < spos; i ++ )
-					*p1 ++ = tv->prg_start[i];
-				spos = 0;
-				*p1 ++ = ch;
-			}
-			break;
-		case 1:
-			if( ch == tv->prg_end[spos] ) {
-				if( ++ spos == tv->prg_end_length ) {
-					while( p1 > str && ISWHITECHAR( *(p1 - 1) ) ) p1 --;
-					p2 = str;
-					while( p2 <= p1 && ISWHITECHAR( *p2 ) ) p2 ++;
-					if( p1 > p2 ) {
-						*p1 = '\0';
-						if( ! add_template_item( tv, p2, p1 - p2, &rlb ) )
-							goto error;
-						p1 = str;
-						lpos = 0;
-					}
-					step = 0;
-					sp2 = spos = 0;
-				}
-			}
-			else if( ch == tv->cmd_sep[sp2] ) {
-				if( ++ sp2 == tv->cmd_sep_length ) {
-					while( p1 > str && ISWHITECHAR( *(p1 - 1) ) ) p1 --;
-					p2 = str;
-					while( p2 <= p1 && ISWHITECHAR( *p2 ) ) p2 ++;
-					if( p1 > p2 ) {
-						*p1 = '\0';
-						if( ! add_template_item( tv, p2, p1 - p2, &rlb ) )
-							goto error;
-						p1 = str;
-						lpos = 0;
-					}
-					sp2 = spos = 0;
-				}
-			}
-			else {
-				for( i = 0; i < spos; i ++ )
-					*p1 ++ = tv->prg_end[i];
-				for( i = 0; i < sp2; i ++ )
-					*p1 ++ = tv->cmd_sep[i];
-				sp2 = spos = 0;
-				*p1 ++ = ch;
-			}
-			break;
-		}
-	}
-	if( str != NULL ) {
-		switch( step ) {
-		case 0:
-			p2 = str;
-			if( rlb ) {
-				if( *p2 == 13 && p2 <= p1 ) p2 ++;
-				if( *p2 == 10 && p2 <= p1 ) p2 ++;
-			}
-			if( p1 > p2 ) {
-				*p1 = '\0';
-				if( ! add_template_item_text( tv, p2, p1 - p2 ) )
-					goto error;
-			}
-			break;
-		case 1:
-			while( p1 > str && ISWHITECHAR( *(p1 - 1) ) ) p1 --;
-			p2 = str;
-			while( p2 <= p1 && ISWHITECHAR( *p2 ) ) p2 ++;
-			if( p1 > p2 ) {
-				*p1 = '\0';
-				if( ! add_template_item( tv, p2, p1 - p2, &rlb ) )
-					goto error;
-			}
-			break;
-		}
 	}
 	else {
+		my_strcpy( tv->parser.file, "ANON" );
+		Newx( buf, len + 1, char );
+		Copy( tpl, buf, len + 1, char );
+		buf[len] = '\0';
+	}
+	bufe = buf + len;
+	prgsp = prgsb = tv->prg_start;
+	prgsf = tv->prg_start + tv->prg_start_length;
+	prgep = prgeb = tv->prg_end;
+	prgef = tv->prg_end + tv->prg_end_length;
+	cmdsp = cmdsb = tv->cmd_sep;
+	cmdse = tv->cmd_sep + tv->cmd_sep_length;
+	//_debug( "prg start: %s\n", prgsb );
+	tv->parser.column = 0;
+	tv->parser.row = 1;
+	for( s2 = s1 = buf; s1 < bufe; s1 ++ ) {
+		switch( *s1 ) {
+		case '\n':
+			tv->parser.row ++;
+			tv->parser.column = 1;
+			prgsp = prgsb;
+			break;
+		case '\r':
+			continue;
+		default:
+			tv->parser.column ++;
+		}
+		//_debug( "char %c\n", *s1 );
+		switch( step ) {
+		case 0:
+			if( *s1 == *prgsp ) {
+				if( ++ prgsp == prgsf ) {
+					s1 += 1 - tv->prg_start_length;
+					step = 1;
+					//_debug( "prg start\n" );
+					if( rlb ) {
+						if( *s2 == '\r' && s2 < s1 ) s2 ++;
+						if( *s2 == '\n' && s2 < s1 ) s2 ++;
+					}
+					if( s2 < s1 ) {
+						//_debug( "found text %s\n", s1 );
+						*s1 = '\0';
+						if( ! add_template_item_text( tv, s2, s1 - s2 ) )
+							goto error;
+					}
+					s2 = s1 + tv->prg_start_length;
+					prgsp = prgsb;
+				}
+			}
+			else {
+				prgsp = prgsb;
+			}
+			break;
+		case 1:
+			if( *s1 == *prgep ) {
+				if( ++ prgep == prgef ) {
+					s1 += 1 - tv->prg_end_length;
+					step = 0;
+					//_debug( "prg end\n" );
+					for( s3 = s1; s3 > s2 && ISWHITECHAR( s3[-1] ) ; s3 -- );
+					for( ; s2 <= s3 && ISWHITECHAR( *s2 ) ; s2 ++ );
+					if( s2 < s3 ) {
+						*s3 = '\0';
+						_debug( "found item %u %s\n", s3 - s2, s2 );
+						if( ! add_template_item( tv, s2, s3 - s2, &rlb ) )
+							goto error;
+					}
+					s2 = s1 + tv->prg_end_length;
+					prgep = prgeb;
+				}
+			}
+			else if( *s1 == *cmdsp ) {
+				if( ++ cmdsp == cmdse ) {
+					s1 += 1 - tv->cmd_sep_length;
+					for( s3 = s1; s3 > s2 && ISWHITECHAR( s3[-1] ) ; s3 -- );
+					for( ; s2 <= s3 && ISWHITECHAR( *s2 ) ; s2 ++ );
+					if( s2 < s3 ) {
+						*s3 = '\0';
+						if( ! add_template_item( tv, s2, s3 - s2, &rlb ) )
+							goto error;
+					}
+					s2 = s1 + tv->cmd_sep_length;
+					cmdsp = cmdsb;
+				}
+			}
+			else {
+				prgep = prgeb;
+				cmdsp = cmdsb;
+			}
+			break;
+		}
+	}
+	//_debug( "s2 %u s1 %u\n", s2, s1 );
+	if( s2 < s1 ) {
+		if( step == 0 ) {
+			if( ! add_template_item_text( tv, s2, s1 - s2 ) )
+				goto error;
+		}
+		else {
+			sprintf(
+				tv->last_error, "syntax error on line %d", tv->parser.row );
+			goto error;
+		}
+	}
+	else if( s1 == buf ) {
 		if( ! add_template_item_text( tv, "", 0 ) )
 			goto error;
 	}
-	i = 1;
+	ret = 1;
 	goto exit;
 error:
-	i = 0;
+	ret = 0;
 exit:
-	if( type == 1 )
-		PerlIO_close( pfile );
-	Safefree( str );
-	if( path != NULL )
-		Safefree( path );
-	return i;
+	Safefree( path );
+	Safefree( buf );
+	return ret;
 }

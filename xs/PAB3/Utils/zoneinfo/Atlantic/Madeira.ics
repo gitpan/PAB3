@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Atlantic/Madeira
+TZID:/navalla.org/20071203_1/Atlantic/Madeira
 X-LIC-LOCATION:Atlantic/Madeira
 BEGIN:DAYLIGHT
 TZOFFSETFROM:+0000

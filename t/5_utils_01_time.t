@@ -6,11 +6,8 @@ require PAB3::Utils;
 import PAB3::Utils;
 
 $time = time;
-@gt = &PAB3::Utils::gmtime( $time );
-print '', ( $#gt == 8 ? "ok" : "failed" ), " 1\n";
-
 @lt = &PAB3::Utils::localtime( $time );
-print '', ( $#lt == 8 ? "ok" : "failed" ), " 2\n";
+print '', ( @lt == 9 ? "ok" : "failed" ), " 1\n";
 
 use Cwd;
 
@@ -30,8 +27,8 @@ else {
 	print STDERR "skipped, zoneinfo path not found\n";
 	print "ok ";
 }
-print "3\n";
+print "2\n";
 
 BEGIN {
-	$tests = 3;
+	$tests = 2;
 }

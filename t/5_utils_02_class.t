@@ -41,6 +41,9 @@ else {
 	print "ok 4\n";
 }
 
+#undef $util;
+
 BEGIN {
 	$tests = 4;
+	unshift @INC, 'blib/lib', 'blib/arch';
 }

@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/America/Mexico_City
+TZID:/navalla.org/20071203_1/America/Mexico_City
 X-LIC-LOCATION:America/Mexico_City
 BEGIN:DAYLIGHT
 TZOFFSETFROM:-0600

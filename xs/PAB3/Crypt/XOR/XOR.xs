@@ -17,15 +17,12 @@
 #define NIBBLETOHEX(val) \
 	( (val) >= 10 && (val) <= 15 ? 87 + (val) : 48 + (val) )
 
-static const char NIBBLE_HEX_TABLE[] = {
-	'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
-};
+static const char *NIBBLE_HEX_TABLE = "0123456789abcdef";
 
 MODULE = PAB3::Crypt::XOR		PACKAGE = PAB3::Crypt::XOR
 
 BOOT:
 {
-	//printf( "booting\n" );
 }
 
 #/******************************************************************************
@@ -57,16 +54,17 @@ CODE:
 	New( 1, obuf, ilen, char );
 	p1 = obuf;
 	seed = pass[0];
-	for( i = 1; i < plen; i ++ ) seed = seed ^ pass[i];
-	p = ( seed % plen );
+	for( i = 1; i < plen; i ++ )
+		seed = seed ^ pass[i];
+	p = (seed % plen);
 	for( i = 0; i < ilen; i ++ ) {
 		p ++;
 		if( p >= plen ) p = 0;
 		rval = pass[p];
-		if( p == ( seed % plen ) )
-			seed = ( pass[p] ^ seed );
-		rval = ( pass[p] ^ seed );
-		*p1 ++ = ( ibuf[i] ^ rval );
+		if( p == (seed % plen) )
+			seed = (pass[p] ^ seed);
+		rval = (pass[p] ^ seed);
+		*p1 ++ = (ibuf[i] ^ rval);
 	}
 	ST(0) = sv_2mortal( newSVpvn( obuf, ilen ) );
 	Safefree( obuf );
@@ -88,16 +86,18 @@ CODE:
 	New( 1, obuf, ilen * 2, char );
 	p1 = obuf;
 	seed = pass[0];
-	for( i = 1; i < plen; i ++ ) seed = seed ^ pass[i];
-	p = ( seed % plen );
+	for( i = 1; i < plen; i ++ )
+		seed = seed ^ pass[i];
+	p = (seed % plen);
 	for( i = 0; i < ilen; i ++ ) {
 		p ++;
-		if( p >= plen ) p = 0;
+		if( p >= plen )
+			p = 0;
 		rval = pass[p];
-		if( p == ( seed % plen ) ) {
-			seed = ( pass[p] ^ seed );
+		if( p == (seed % plen) ) {
+			seed = (pass[p] ^ seed);
 		}
-		rval = ( pass[p] ^ seed );
+		rval = (pass[p] ^ seed);
 		rval ^= ibuf[i];
 		rem = rval % 16;
 		rval /= 16;
@@ -121,23 +121,24 @@ PREINIT:
 CODE:
 	pass = SvPVx( _pass, plen );
 	ibuf = SvPVx( _ibuf, ilen );
-	New( 1, obuf, ilen / 2 + ( ilen % 2 ) + 1, char );
+	New( 1, obuf, ilen / 2 + (ilen % 2) + 1, char );
 	p1 = obuf;
 	seed = pass[0];
-	for( i = 1; i < plen; i ++ ) seed = seed ^ pass[i];
-	p = ( seed % plen );
+	for( i = 1; i < plen; i ++ )
+		seed = seed ^ pass[i];
+	p = (seed % plen);
 	for( i = 1; i < ilen; i += 2 ) {
 		p ++;
 		if( p >= plen ) p = 0;
 		rval = pass[p];
-		if( p == ( seed % plen ) ) {
-			seed = ( pass[p] ^ seed );
+		if( p == (seed % plen) ) {
+			seed = (pass[p] ^ seed);
 		}
-		rval = ( pass[p] ^ seed );
+		rval = (pass[p] ^ seed);
 		ch = ibuf[i - 1];
 		val = CHARFROMHEX( ch ) << 4;
 		ch = ibuf[i];
-		*p1 ++ = ( ( val + CHARFROMHEX( ch ) ) ^ rval );
+		*p1 ++ = ((val + CHARFROMHEX( ch )) ^ rval);
 	}
 	ST(0) = sv_2mortal( newSVpvn( obuf, p1 - obuf ) );
 	Safefree( obuf );

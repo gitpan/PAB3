@@ -1,14 +1,34 @@
-#include <EXTERN.h>
-#include <perl.h>
-#include <XSUB.h>
-
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef _WIN32
 #include <sys/stat.h>
+#endif
 #include <stdarg.h>
 
 #include "my_utils.h"
 
+START_MY_CXT
+
+const my_locale_t DEFAULT_LOCALE = {
+	"en_EN", '.', ',', { 3, -2 }, 2, 2, "$", "USD", 'l', 0, '-', '+',
+	"%m/%d/%Y", "%I:%M:%S %p", "%a %b %d %Y %I:%M:%S %p %Z", "%I:%M:%S %p",
+	"AM", "PM", "am", "pm",
+	{
+		"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+		"Oct", "Nov", "Dec"
+	},
+	{
+		"January", "February", "March", "April", "May", "June", "July",
+		"August", "September", "October", "November", "December"
+	},
+	{ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" },
+	{
+		"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
+		"Friday", "Saturday"
+	},
+};
+
+const char *DEFAULT_ZONE = "GMT";
 
 const static int mday_array[] =
 	{ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
@@ -36,11 +56,14 @@ char *PerlIO_fgets( char *buf, size_t max, PerlIO *stream ) {
 	while( pos > 0 ) {
 		val = PerlIO_getc( stream );
 		if( val == -1 ) {
-			if( pos == max + 1 ) return NULL;
+			if( pos == max + 1 )
+				return NULL;
 			break;
 		}
-		else if( val == '\n' ) break;
-		else if( val == '\r' ) continue;
+		else if( val == '\n' )
+			break;
+		else if( val == '\r' )
+			continue;
 		*tmp ++ = (char) val;
 		pos --;
 	}
@@ -51,7 +74,8 @@ char *PerlIO_fgets( char *buf, size_t max, PerlIO *stream ) {
 my_thread_var_t *find_thread_var( my_cxt_t *cxt, UV tid ) {
 	my_thread_var_t *tv1;
 	for( tv1 = cxt->threads; tv1 != NULL; tv1 = tv1->next ) {
-		if( tv1->tid == tid ) return tv1;
+		if( tv1->tid == tid )
+			return tv1;
 	}
 	return NULL;
 }
@@ -100,74 +124,111 @@ void cleanup_my_utils( my_cxt_t *cxt ) {
 		tv1 = tv2;
 	}
 	cxt->threads = cxt->last_thread = NULL;
-	free_locale_alias( cxt );
+	if( cxt->locale_alias_count > 0 )
+		free_locale_alias( cxt );
 }
 
 void free_locale_alias( my_cxt_t *cxt ) {
-	my_locale_alias_t *p1, *p2;
-	p1 = cxt->locale_alias;
-	while( p1 ) {
-		p2 = p1->next;
-		Safefree( p1->alias );
-		Safefree( p1->locale );
-		Safefree( p1 );
-		p1 = p2;
+	int i;
+	for( i = cxt->locale_alias_count - 1; i >= 0; i -- ) {
+		Safefree( cxt->locale_alias[i].alias );
+		Safefree( cxt->locale_alias[i].locale );
 	}
+	Safefree( cxt->locale_alias );
+	cxt->locale_alias_count = 0;
 	cxt->locale_alias = NULL;
 }
 
 void read_locale_alias( my_cxt_t *cxt ) {
-	PerlIO *pfile;
-	char str[256], *key, *val, *p1;
-	int lkey, lval;
-	my_locale_alias_t *pl1, *pl2 = NULL;
-	free_locale_alias( cxt );
-	key = my_strcpy( str, cxt->locale_path );
-	my_strcpy( key, "#alias" );
-	//printf( "read locale alias from %s\n", str );
-	pfile = PerlIO_open( str, "r" );
-	if( ! pfile ) return;
-	while( ( p1 = PerlIO_fgets( str, sizeof( str ), pfile ) ) ) {
-		if( p1 == str ) continue;
-		key = str;
-		while( ISWHITECHAR( *key ) ) {
-			if( key >= p1 ) continue;
-			key ++;
+	char path[MAX_PATH], *buffer, *s1, *key, *val, *s2;
+	PerlIO *file;
+	struct stat stat_p;
+	int bsize, lc = 0;
+	if( cxt->locale_alias_count )
+		free_locale_alias( cxt );
+	s1 = path;
+	FASTSTRCPY( s1, cxt->locale_path );
+	FASTSTRCPY( s1, "#alias" );
+	*s1 = '\0';
+	if( stat( path, &stat_p ) != 0 )
+		return;
+	if( (file = PerlIO_open( path, "r" )) == NULL )
+		return;
+	Newx( buffer, stat_p.st_size + 2, char );
+	bsize = PerlIO_read( file, buffer, stat_p.st_size );
+	PerlIO_close( file );
+	buffer[bsize] = '\0';
+	buffer[bsize + 1] = '\0';
+	for( s1 = buffer; ; s1 ++ ) {
+next_char:
+		switch( *s1 ) {
+		case '\0':
+			goto parse_finish;
+		case '\n':
+		case '\r':
+		case '\t':
+		case ' ':
+			continue;
+		case '#':
+			for( s1 ++; *s1 != '\0' && *s1 != '\n'; s1 ++ );
+			goto next_char;
+		default:
+			key = s1;
+			/* search end of key */
+			for( s1 ++; ; s1 ++ ) {
+				if( *s1 == '\0' )
+					goto parse_finish;
+				else if( *s1 == '\n' || *s1 == '#' )
+					goto next_char;
+				else if( *s1 == '\t' || *s1 == ' ' ) {
+					s2 = s1;
+					*s2 = '\0';
+					break;
+				}
+			}
+			/* search begin of val */
+			for( s1 ++; ; s1 ++ ) {
+				if( *s1 == '\0' )
+					goto parse_finish;
+				else if( *s1 == '\n' || *s1 == '#' )
+					goto next_char;
+				else if( *s1 == '\t' || *s1 == ' ' )
+					continue;
+				else {
+					val = s1;
+					break;
+				}
+			}
+			/* search end of val */
+			for( s1 ++; ; s1 ++ ) {
+				if( *s1 == '\0' || *s1 == '\n' || *s1 == '\t'
+					|| *s1 == ' ' || *s1 == '#'
+				) {
+					*s1 = '\0';
+					break;
+				}
+			}
+			/*printf( "alias found %d [%s] -> [%s]\n", lc, key, val );*/
+			if( (lc % 7) == 0 )
+				Renew( cxt->locale_alias, lc + 7, my_locale_alias_t );
+			Newx( cxt->locale_alias[lc].alias, s2 - key + 1, char );
+			Copy( key, cxt->locale_alias[lc].alias, s2 - key + 1, char );
+			Newx( cxt->locale_alias[lc].locale, s1 - val + 1, char );
+			Copy( val, cxt->locale_alias[lc].locale, s1 - val + 1, char );
+			lc ++;
+			break;
 		}
-		if( *key == '#' ) continue;
-		val = key;
-		while( ! ISWHITECHAR( *val ) ) {
-			if( val >= p1 ) continue;
-			val ++;
-		}
-		lkey = val - key;
-		*val ++ = '\0';
-		while( ISWHITECHAR( *val ) ) {
-			if( val >= p1 ) continue;
-			val ++;
-		}
-		lval = p1 - val;
-		//printf( "got alias '%s'(%d) for '%s'(%d)\n", key, lkey, val, lval );
-		Newz( 1, pl1, 1, my_locale_alias_t );
-		New( 1, pl1->alias, lkey, char );
-		New( 1, pl1->locale, lval, char );
-		Copy( key, pl1->alias, lkey + 1, char );
-		Copy( val, pl1->locale, lval + 1, char );
-		if( pl2 == NULL )
-			cxt->locale_alias = pl1;
-		else
-			pl2->next = pl1;
-		pl2 = pl1;
 	}
-	PerlIO_close( pfile );
+parse_finish:
+	cxt->locale_alias_count = lc;
+	Safefree( buffer );
 }
 
 const char *get_locale_alias( my_cxt_t *cxt, const char *id ) {
-	my_locale_alias_t *la1;
-	for( la1 = cxt->locale_alias; la1 != NULL; la1 = la1->next ) {
-		if( strcmp( la1->alias, id ) == 0 ) {
-			//printf( "found alias %s\n", id );
-			return la1->locale;
+	int i;
+	for( i = cxt->locale_alias_count - 1; i >= 0; i -- ) {
+		if( strcmp( cxt->locale_alias[i].alias, id ) == 0 ) {
+			return cxt->locale_alias[i].locale;
 		}
 	}
 	return id;
@@ -181,89 +242,145 @@ const char *get_locale_format_settings( cxt, id, locale )
 	char str[256], *key, *val, *p1;
 	PerlIO *pfile;
 	int i;
-	if( locale == 0 ) return NULL;
+	if( locale == NULL )
+		return NULL;
 	key = my_strncpy( str, cxt->locale_path, cxt->locale_path_length );
 	id = get_locale_alias( cxt, id );
 	my_strcpy( key, id );
 	pfile = PerlIO_open( str, "r" );
-	if( ! pfile ) return NULL;
-	while( ( p1 = PerlIO_fgets( str, sizeof( str ), pfile ) ) ) {
-		if( p1 == str || str[0] == '#' ) continue;
+	if( !pfile )
+		return NULL;
+	while( (p1 = PerlIO_fgets( str, sizeof( str ), pfile )) ) {
+		if( p1 == str || str[0] == '#' )
+			continue;
 		val = strchr( str, ':' );
-		if( ! val ) continue;
+		if( !val )
+			continue;
 		*val ++ = '\0';
 		key = str;
-		if( strcmp( key, "grp" ) == 0 )
-			locale->grouping = (char) atoi( val );
-		else if( strcmp( key, "fd" ) == 0 )
-			locale->frac_digits = (char) atoi( val );
-		else if( strcmp( key, "dp" ) == 0 )
-			locale->decimal_point = val[0];
-		else if( strcmp( key, "ts" ) == 0 )
-			locale->thousands_sep = val[0];
-		else if( strcmp( key, "ns" ) == 0 )
-			locale->negative_sign = val[0];
-		else if( strcmp( key, "ps" ) == 0 )
-			locale->positive_sign = val[0];
-		else if( strcmp( key, "cs" ) == 0 )
-			strncpy( locale->currency_symbol, val, sizeof( locale->currency_symbol ) );
-		else if( strcmp( key, "ics" ) == 0 )
-			strncpy( locale->int_curr_symbol, val, sizeof( locale->int_curr_symbol ) );
-		else if( strcmp( key, "csa" ) == 0 )
-			locale->curr_symb_align = val[0];
-		else if( strcmp( key, "ica" ) == 0 )
-			locale->int_curr_symb_align = val[0];
-		else if( strcmp( key, "ldf" ) == 0 )
-			strncpy( locale->long_date_format, val, sizeof( locale->long_date_format ) );
-		else if( strcmp( key, "sdf" ) == 0 )
-			strncpy( locale->short_date_format, val, sizeof( locale->short_date_format ) );
-		else if( strcmp( key, "ltf" ) == 0 )
-			strncpy( locale->long_time_format, val, sizeof( locale->long_time_format ) );
-		else if( strcmp( key, "stf" ) == 0 )
-			strncpy( locale->short_time_format, val, sizeof( locale->short_time_format ) );
-		else if( strcmp( key, "ams" ) == 0 )
-			strncpy( locale->time_am_string, val, sizeof( locale->time_am_string ) );
-		else if( strcmp( key, "pms" ) == 0 )
-			strncpy( locale->time_pm_string, val, sizeof( locale->time_pm_string ) );
-		else if( strstr( key, "lm" ) == key ) {
-			key += 2;
-			i = atoi( key );
-			if( i < 1 || i > 12 ) continue;
-			strncpy(
-				locale->long_month_names[i - 1],
-				val,
-				sizeof( locale->long_month_names[0] )
-			);
-		}
-		else if( strstr( key, "sm" ) == key ) {
-			key += 2;
-			i = atoi( key );
-			if( i < 1 || i > 12 ) continue;
-			strncpy(
-				locale->short_month_names[i - 1],
-				val,
-				sizeof( locale->short_month_names[0] )
-			);
-		}
-		else if( strstr( key, "ld" ) == key ) {
-			key += 2;
-			i = atoi( key );
-			if( i < 1 || i > 7 ) continue;
-			strncpy(
-				locale->long_day_names[i - 1],
-				val,
-				sizeof( locale->long_day_names[0] )
-			);
-		}
-		else if( strstr( key, "sd" ) == key ) {
-			key += 2;
-			i = atoi( key );
-			if( i < 1 || i > 7 ) continue;
-			strncpy(
-				locale->short_day_names[i - 1],
-				val,
-				sizeof( locale->short_day_names[0] )
-			);
+		switch( *key ) {
+		case 'a':
+			if( strcmp( key, "amu" ) == 0 )
+				strncpy( locale->time_am_upper,
+					val, sizeof( locale->time_am_upper ) );
+			else if( strcmp( key, "aml" ) == 0 )
+				strncpy( locale->time_am_lower,
+					val, sizeof( locale->time_am_lower ) );
+			else if( strcmp( key, "apf" ) == 0 )
+				strncpy( locale->ampm_format,
+					val, sizeof( locale->ampm_format ) );
+			break;
+		case 'c':
+			if( strcmp( key, "cs" ) == 0 )
+				strncpy( locale->currency_symbol,
+					val, sizeof( locale->currency_symbol ) );
+			else if( strcmp( key, "csa" ) == 0 )
+				locale->curr_symb_align = val[0];
+			else if( strcmp( key, "css" ) == 0 )
+				locale->curr_symb_space = val[0] - '0';
+			break;
+		case 'd':
+			if( strcmp( key, "dp" ) == 0 )
+				locale->decimal_point = val[0];
+			else if( strcmp( key, "df" ) == 0 )
+				strncpy( locale->date_format,
+					val, sizeof( locale->date_format ) );
+			else if( strcmp( key, "dtf" ) == 0 )
+				strncpy( locale->datetime_format,
+					val, sizeof( locale->datetime_format ) );
+			break;
+		case 'f':
+			if( strcmp( key, "fd" ) == 0 )
+				locale->frac_digits = (char) atoi( val );
+			break;
+		case 'g':
+			if( strcmp( key, "grp" ) == 0 ) {
+				/* 3;2 */
+				for( i = 0; *val != '\0'; i ++ ) {
+					locale->grouping[i] = *val - '0';
+					if( val[1] == '\0' || i == 2 ) {
+						i ++;
+						break;
+					}
+					val += 2;
+				}
+				locale->grouping[i] = -2;
+			}
+			break;
+		case 'i':
+			if( strcmp( key, "ics" ) == 0 )
+				strncpy( locale->int_curr_symbol,
+					val, sizeof( locale->int_curr_symbol ) );
+			break;
+		case 'l':
+			if( strstr( key, "lm" ) == key ) {
+				key += 2;
+				i = atoi( key );
+				if( i < 1 || i > 12 )
+					continue;
+				strncpy(
+					locale->long_month_names[i - 1],
+					val,
+					sizeof( locale->long_month_names[0] )
+				);
+			}
+			else if( strstr( key, "ld" ) == key ) {
+				key += 2;
+				i = atoi( key );
+				if( i < 1 || i > 7 )
+					continue;
+				strncpy(
+					locale->long_day_names[i - 1],
+					val,
+					sizeof( locale->long_day_names[0] )
+				);
+			}
+			break;
+		case 'n':
+			if( strcmp( key, "ns" ) == 0 )
+				locale->negative_sign = val[0];
+			break;
+		case 'p':
+			if( strcmp( key, "ps" ) == 0 )
+				locale->positive_sign = val[0];
+			else if( strcmp( key, "pml" ) == 0 )
+				strncpy( locale->time_pm_lower,
+					val, sizeof( locale->time_pm_lower ) );
+			else if( strcmp( key, "pmu" ) == 0 )
+				strncpy( locale->time_pm_upper,
+					val, sizeof( locale->time_pm_upper ) );
+			break;
+		case 's':
+			if( strstr( key, "sm" ) == key ) {
+				key += 2;
+				i = atoi( key );
+				if( i < 1 || i > 12 )
+					continue;
+				strncpy(
+					locale->short_month_names[i - 1],
+					val,
+					sizeof( locale->short_month_names[0] )
+				);
+			}
+			else if( strstr( key, "sd" ) == key ) {
+				key += 2;
+				i = atoi( key );
+				if( i < 1 || i > 7 )
+					continue;
+				strncpy(
+					locale->short_day_names[i - 1],
+					val,
+					sizeof( locale->short_day_names[0] )
+				);
+			}
+			break;
+		case 't':
+			if( strcmp( key, "ts" ) == 0 )
+				locale->thousands_sep = val[0];
+			else if( strcmp( key, "tf" ) == 0 )
+				strncpy( locale->time_format,
+					val, sizeof( locale->time_format ) );
+			break;
 		}
 	}
 	PerlIO_close( pfile );
@@ -271,80 +388,91 @@ const char *get_locale_format_settings( cxt, id, locale )
 }
 
 time_t seconds_since_epoch( my_vdatetime_t *tim ) {
-	int i, leapyear, year;
+	int i, year;
 	time_t days = 0;
-	//if( tim == NULL ) return 0;
+	/* calc days of years starting at 1970-01-01 */
 	year = tim->tm_year + 1900;
-	for( i = 1970; i < year; i ++ ) {
-		leapyear = ( ( i % 4 == 0 && i % 100 != 0 ) || i % 400 == 0 );
-		days += leapyear ? 366 : 365;
-	}
-	if( tim->tm_mon > 1 ) {
-		days += ( ( year % 4 == 0 && year % 100 != 0 ) || year % 400 == 0 );
-	}
-	for( i = 0; i < tim->tm_mon - 1; i ++ ) {
+	for( i = year - 1; i >= 1970; i -- )
+		days += 365 + ((i % 4 == 0 && i % 100 != 0) || i % 400 == 0);
+	/* add days of full months */
+	for( i = tim->tm_mon - 2; i >= 0; i -- )
 		days += mday_array[i];
-	}
-	days += tim->tm_mday;
-	return days * 86400 + tim->tm_hour * 3600 + tim->tm_min * 60 + tim->tm_sec;
+	/* add day in leapyear after February */
+	if( tim->tm_mon > 1 )
+		days += ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0);
+	/* add days in the current month */
+	days += tim->tm_mday - 1;
+	return
+		days * 86400 + tim->tm_hour * 3600 + tim->tm_min * 60 + tim->tm_sec
+			- (tim->tm_gmtoff / 100) * 3600 + (tim->tm_gmtoff % 100) * 60;
 }
 
 int get_week_number( my_vdatetime_t *tim, int dayoffset, int iso ) {
-	/*
-	char tmp[256];
-	strftime( tmp, sizeof( tmp ), "%%c %c %%W %W %%U %U %%V %V %%v %v %%o %o %%z %z %%G %G %%g %g", (struct tm*) tim );
-	printf( "%s\n", tmp );
-	*/
 	int weeknum, offset;
 	int year = tim->tm_year + 1900;
 	int yday = tim->tm_yday + 1;
-	int wd0101 = tim->tm_wday - ( tim->tm_yday % 7 );
-	if( wd0101 < 0 ) wd0101 += 7; else if( wd0101 > 6 ) wd0101 -= 7;
+	int wd0101 = tim->tm_wday - (tim->tm_yday % 7);
+	if( wd0101 < 0 )
+		wd0101 += 7;
+	else if( wd0101 > 6 )
+		wd0101 -= 7;
 	if( iso ) {
-		if( dayoffset )
-			if( wd0101 == 0 ) wd0101 = 6; else wd0101 --;
+		if( dayoffset ) {
+			if( wd0101 == 0 )
+				wd0101 = 6;
+			else
+				wd0101 --;
+		}
 		weeknum = ( yday + wd0101 - 1 ) / 7;
 		if( wd0101 < 4 )
 			return weeknum + 1;
 		if( weeknum != 0 )
 			return weeknum;
 		year --;
-		wd0101 -= ( ( year % 4 == 0 && year % 100 != 0 ) || year % 400 == 0 ) ? 2 : 1;
-		if( dayoffset )
-			if( wd0101 == 0 ) wd0101 = 6; else wd0101 --;
-		return ( wd0101 < 4 ) ? 53 : 52;
+		wd0101 -= ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0) + 1;
+		if( dayoffset ) {
+			if( wd0101 == 0 )
+				wd0101 = 6;
+			else
+				wd0101 --;
+		}
+		return (wd0101 < 4) ? 53 : 52;
 	}
 	offset = 7 + 1 - wd0101 + dayoffset;
-	if( offset == 8 ) offset = 1;
-	return ( yday - offset + 7 ) / 7;
-	/*
-	int weeknum = ( yday - offset + 7 ) / 7;
-	if( weeknum != 0 ) return weeknum;
-	year --;
-	wd0101 -= ( ( year % 4 == 0 && year % 100 != 0 ) || year % 400 == 0 ) ? 2 : 1;
-	if( wd0101 < 0 ) wd0101 += 7;
-	offset = 7 + 1 - wd0101 + dayoffset;
-	return ( offset == 2 || offset == 8 ) ? 53 : 52;
-	*/
+	if( offset == 8 )
+		offset = 1;
+	return (yday - offset + 7) / 7;
 }
 
 int get_iso8601_year( my_vdatetime_t *tim, int full ) {
 	int year = tim->tm_year - 100;
-	int wd0101 = tim->tm_wday - ( tim->tm_yday % 7 );
-	if( wd0101 < 0 ) wd0101 += 7; else if( wd0101 > 6 ) wd0101 -= 7;
-	if( wd0101 == 0 ) wd0101 = 6; else wd0101 --;
-	if( wd0101 >= 4 ) year --;
-	if( full ) return year + 2000;
-	if( year < 0 ) return year + 100;
-	while( year > 100 ) year -= 100;
+	int wd0101 = tim->tm_wday - (tim->tm_yday % 7);
+	if( wd0101 < 0 )
+		wd0101 += 7;
+	else if( wd0101 > 6 )
+		wd0101 -= 7;
+	if( wd0101 == 0 )
+		wd0101 = 6;
+	else
+		wd0101--;
+	if( wd0101 >= 4 )
+		year--;
+	if( full )
+		return year + 2000;
+	if( year < 0 )
+		return year + 100;
+	while( year > 100 )
+		year -= 100;
 	return year;
 }
 
 int is_short_year( my_vdatetime_t *tim ) {
 	int y = tim->tm_year + 1900;
 	y = y + y / 4 - y / 100 + y / 400;
-	if( ( y % 7 ) == 4 ) return 0;
-	if( ( ( y - 1 ) % 7 ) == 3 ) return 0;
+	if( (y % 7) == 4 )
+		return 0;
+	if( ((y - 1) % 7) == 3 )
+		return 0;
 	return 1;
 }
 
@@ -360,269 +488,266 @@ int _int_strftime( tv, str, maxlen, format, stime )
 	const char *format;
 	my_vdatetime_t *stime;
 {
-	int i, fml, step, val, l;
-	char *ret, *ml;
+	int val, l;
+	char *ret, *ml, ch;
 	const char *sval;
-	unsigned char tmp[8];
 	time_t uval;
-	if( str == NULL || format == NULL ) return 0;
-	if( stime == NULL ) {
+	if( str == NULL || format == NULL )
+		return 0;
+	if( stime == NULL )
 		stime = apply_timezone( tv, 0 );
-	}
-	fml = strlen( format );
+
 	ml = str + maxlen;
 	ret = str;
-	step = 0;
-	for( i = 0; i < fml && ret < ml; i ++ ) {
-		switch( step ) {
-		case 0:
-			if( format[i] == '%' ) {
-				step = 1;
-				continue;
-			}
-			*ret ++ = format[i];
+	while( ret < ml ) {
+		if( (ch = *format++) != '%' ) {
+			if( ch == '\0' )
+				goto exit;
+			*ret++ = ch;
+			continue;
+		}
+		if( ret >= ml )
+			goto exit;
+		switch( (ch = *format++) ) {
+		case '\0':
+			*ret++ = '%';
+			goto exit;
+		case '%':
+			*ret++ = '%';
 			break;
-		case 1:
-			switch( format[i] ) {
-			case '%':
-				*ret ++ = '%';
-				break;
-			case 'I':
-				val = stime->tm_hour;
-				if( val == 0 ) val = 12;
-				else if( val > 12 ) val -= 12;
-				goto setval_2digits;
-			case 'H':
-				val = stime->tm_hour;
-				goto setval_2digits;
-			case 'M':
-				val = stime->tm_min;
-				goto setval_2digits;
-			case 'S':
-				val = stime->tm_sec;
-				goto setval_2digits;
-			case 'm':
-				val = stime->tm_mon + 1;
-				goto setval_2digits;
-			case 'd':
-				val = stime->tm_mday;
-				goto setval_2digits;
-			case 'C':
-				val = ( 1900 + stime->tm_year ) / 100;
-				while( val > 100 ) val -= 100;
-				goto setval_2digits;
-			case 'g':
-				val = get_iso8601_year( stime, 0 );
-				goto setval_2digits;
-			case 'U':
-				val = get_week_number( stime, 0, 0 );
-				goto setval_2digits;
-			case 'V':
-				val = get_week_number( stime, 1, 1 );
-				goto setval_2digits;
-			case 'W':
-				val = get_week_number( stime, 1, 0 );
-				goto setval_2digits;
-			case 'y':
-				val = stime->tm_year;
-				while( val >= 100 ) val -= 100;
+		case 'I':
+			val = stime->tm_hour;
+			if( val == 0 )
+				val = 12;
+			else if( val > 12 )
+				val -= 12;
+			goto setval_2digits;
+		case 'H':
+			val = stime->tm_hour;
+			goto setval_2digits;
+		case 'M':
+			val = stime->tm_min;
+			goto setval_2digits;
+		case 'S':
+			val = stime->tm_sec;
+			goto setval_2digits;
+		case 'm':
+			val = stime->tm_mon + 1;
+			goto setval_2digits;
+		case 'd':
+			val = stime->tm_mday;
+			goto setval_2digits;
+		case 'C':
+			val = (1900 + stime->tm_year) / 100;
+			while( val > 100 )
+				val -= 100;
+			goto setval_2digits;
+		case 'g':
+			val = get_iso8601_year( stime, 0 );
+			goto setval_2digits;
+		case 'U':
+			val = get_week_number( stime, 0, 0 );
+			goto setval_2digits;
+		case 'V':
+			val = get_week_number( stime, 1, 1 );
+			goto setval_2digits;
+		case 'W':
+			val = get_week_number( stime, 1, 0 );
+			goto setval_2digits;
+		case 'y':
+			val = stime->tm_year;
+			while( val >= 100 )
+				val -= 100;
 setval_2digits:
-				if( ret >= ml - 1 ) goto exit;
-				my_itoa( ret, val, 10 );
-				if( ! ret[1] ) {
-					ret[1] = ret[0];
-					ret[0] = '0';
-				}
-				ret += 2;
-				break;
-			case 'e':
-				val = stime->tm_mday;
-				goto setval_2digits_space;
-			case 'l':
-				val = stime->tm_hour;
-				if( val == 0 ) val = 12;
-				else if( val > 12 ) val -= 12;
-				goto setval_2digits_space;
-			case 'k':
-				val = stime->tm_hour;
-				//goto setval_2digits_space;
-setval_2digits_space:
-				if( ret >= ml - 1 ) goto exit;
-				my_itoa( ret, val, 10 );
-				if( ! ret[1] ) {
-					ret[1] = ret[0];
-					ret[0] = ' ';
-				}
-				ret += 2;
-				break;
-			case 'n':
-				*ret ++ = '\n';
-			case 't':
-				*ret ++ = '\t';
-				break;
-			case 'a':
-				sval = tv->locale.short_day_names[stime->tm_wday];
-				goto setval_str;
-			case 'A':
-				sval = tv->locale.long_day_names[stime->tm_wday];
-				goto setval_str;
-			case 'b':
-			case 'h':
-				sval = tv->locale.short_month_names[stime->tm_mon];
-				goto setval_str;
-			case 'B':
-				sval = tv->locale.long_month_names[stime->tm_mon];
-				goto setval_str;
-			case 'Z':
-				sval = stime->tm_zone;
-				goto setval_str;
-			case 'p':
-				if( stime->tm_hour >= 12 )
-					sval = tv->locale.time_pm_string;
-				else
-					sval = tv->locale.time_am_string;
-				goto setval_str;
-			case 'P':
-				if( stime->tm_hour >= 12 )
-					sval = tv->locale.time_pm_string;
-				else
-					sval = tv->locale.time_am_string;
-				for( l = 0; sval[l] != '\0'; l ++ )
-					tmp[l] = tolower( sval[l] );
-				tmp[l] = '\0';
-				sval = (const char *) tmp;
-setval_str:
-				while( 1 ) {
-					if( ret >= ml ) goto exit;
-					if( *sval == '\0' ) break;
-					*ret ++ = *sval ++;
-				}
-				break;
-			case 'G':
-				val = get_iso8601_year( stime, 1 );
-				if( ret >= ml - 3 ) goto exit;
-				ret = my_itoa( ret, val, 10 );
-				break;
-			case 'Y':
-				val = stime->tm_year + 1900;
-				if( ret >= ml - 3 ) goto exit;
-				ret = my_itoa( ret, val, 10 );
-				break;
-			case 'w':
-				if( ret >= ml ) goto exit;
-				ret = my_itoa( ret, stime->tm_wday, 10 );
-				break;
-			case 'u':
-				if( ret >= ml ) goto exit;
-				ret = my_itoa( ret, stime->tm_wday == 0 ? 7 : stime->tm_wday, 10 );
-				break;
-			case 'j':
-				if( ret >= ml - 2 ) goto exit;
-				my_itoa( ret, stime->tm_yday + 1, 10 );
-				if( ! ret[1] ) {
-					ret[2] = ret[0];
-					ret[0] = ret[1] = '0';
-				}
-				else if( ! ret[2] ) {
-					ret[2] = ret[1];
-					ret[1] = ret[0];
-					ret[0] = '0';
-				}
-				ret += 3;
-				break;
-			case 'o':
-			case 'O':
-				if( ret >= ml - 6 ) goto exit;
-				val = stime->tm_gmtoff;
-				val = ( val / 100 ) * 3600 + ( val % 100 ) * 60;
-				ret = my_itoa( ret, val, 10 );
-				break;
-			case 'z':
-				if( ret >= ml - 5 ) goto exit;
-				val = stime->tm_gmtoff;
-				if( val < 0 ) {
-					*ret ++ = '-';
-					val *= -1;
-				}
-				else if( val == 0 ) {
-					ret = my_strcpy( ret, "+0000" );
-					break;
-				}
-				else
-					*ret ++ = '+';
-				if( val < 1000 )
-					*ret ++ = '0';
-				ret = my_itoa( ret, val, 10 );
-				break;
-			case 's':
-				if( ret >= ml - 10 ) goto exit;
-				uval = seconds_since_epoch( stime );
-				l = sprintf( ret, "%lu", uval );
-				ret += l;
-				break;
-			case 'D':
-				l = _int_strftime( tv, ret, (int) ( ml - ret ), "%m/%d/%y", stime );
-				ret += l;
-				break;
-			case 'F':
-				l = _int_strftime( tv, ret, (int) ( ml - ret ), "%Y-%m-%d", stime );
-				ret += l;
-				break;
-			case 'r':
-				l = _int_strftime( tv, ret, (int) ( ml - ret ), "%I:%M:%S %p", stime );
-				ret += l;
-				break;
-			case 'R':
-				l = _int_strftime( tv, ret, (int) ( ml - ret ), "%H:%M", stime );
-				ret += l;
-				break;
-			case 'T':
-				l = _int_strftime( tv, ret, (int) ( ml - ret ), "%H:%M:%S", stime );
-				ret += l;
-				break;
-			case 'x':
-				l = _int_strftime(
-					tv, ret, (int) ( ml - ret ), tv->locale.short_date_format, stime
-				);
-				ret += l;
-				break;
-			case 'X':
-				l = _int_strftime(
-					tv, ret, (int) ( ml - ret ), tv->locale.short_time_format, stime
-				);
-				ret += l;
-				break;
-			case 'v':
-				l = _int_strftime(
-					tv, ret, (int) ( ml - ret ), "%e-%b-%Y", stime
-				);
-				ret += l;
-				break;
-			case 'c':
-			case '+':
-				l = _int_strftime(
-					tv, ret, (int) ( ml - ret ), tv->locale.long_date_format, stime
-				);
-				ret += l;
-				if( ret >= ml - 1 ) goto exit;
-				*ret ++ = ' ';
-				l = _int_strftime(
-					tv, ret, (int) ( ml - ret ), tv->locale.long_time_format, stime
-				);
-				ret += l;
-				break;
-			default:
-				*ret ++ = '%';
-				if( ret >= ml ) goto exit;
-				*ret ++ = format[i];
-			}
-			step = 0;
+			if( ret >= ml )
+				goto exit;
+			*ret ++= val >= 10 ? '0' + (val / 10) : '0';
+			if( ret >= ml )
+				goto exit;
+			*ret ++= '0' + (val % 10);
 			break;
+		case 'e':
+			val = stime->tm_mday;
+			goto setval_2digits_space;
+		case 'l':
+			val = stime->tm_hour;
+			if( val == 0 )
+				val = 12;
+			else
+			if( val > 12 )
+				val -= 12;
+			goto setval_2digits_space;
+		case 'k':
+			val = stime->tm_hour;
+setval_2digits_space:
+			if( ret >= ml )
+				goto exit;
+			*ret ++= val >= 10 ? '0' + (val / 10) : ' ';
+			if( ret >= ml )
+				goto exit;
+			*ret ++= '0' + (val % 10);
+			break;
+		case 'n':
+			*ret ++ = '\n';
+		case 't':
+			*ret ++ = '\t';
+			break;
+		case 'a':
+			sval = tv->locale.short_day_names[stime->tm_wday];
+			goto setval_str;
+		case 'A':
+			sval = tv->locale.long_day_names[stime->tm_wday];
+			goto setval_str;
+		case 'b':
+		case 'h':
+			sval = tv->locale.short_month_names[stime->tm_mon];
+			goto setval_str;
+		case 'B':
+			sval = tv->locale.long_month_names[stime->tm_mon];
+			goto setval_str;
+		case 'Z':
+			sval = stime->tm_zone;
+			goto setval_str;
+		case 'p':
+			if( stime->tm_hour >= 12 )
+				sval = tv->locale.time_pm_upper;
+			else
+				sval = tv->locale.time_am_upper;
+			goto setval_str;
+		case 'P':
+			if( stime->tm_hour >= 12 )
+				sval = tv->locale.time_pm_lower;
+			else
+				sval = tv->locale.time_am_lower;
+setval_str:
+			while( 1 ) {
+				if( ret >= ml )
+					goto exit;
+				if( *sval == '\0' )
+					break;
+				*ret ++ = *sval ++;
+			}
+			break;
+		case 'G':
+			val = get_iso8601_year( stime, 1 );
+			if( ret >= ml - 3 )
+				goto exit;
+			ret = my_itoa( ret, val, 10 );
+			break;
+		case 'Y':
+			val = stime->tm_year + 1900;
+			if( ret >= ml - 3 )
+				goto exit;
+			ret = my_itoa( ret, val, 10 );
+			break;
+		case 'w':
+			if( ret >= ml )
+				goto exit;
+			ret = my_itoa( ret, stime->tm_wday, 10 );
+			break;
+		case 'u':
+			if( ret >= ml )
+				goto exit;
+			ret = my_itoa(
+				ret, stime->tm_wday == 0 ? 7 : stime->tm_wday, 10 );
+			break;
+		case 'j':
+			if( ret >= ml - 2 )
+				goto exit;
+			my_itoa( ret, stime->tm_yday + 1, 10 );
+			if( ! ret[1] ) {
+				ret[2] = ret[0];
+				ret[0] = ret[1] = '0';
+			}
+			else if( ! ret[2] ) {
+				ret[2] = ret[1];
+				ret[1] = ret[0];
+				ret[0] = '0';
+			}
+			ret += 3;
+			break;
+		case 'o':
+		case 'O':
+			if( ret >= ml - 6 )
+				goto exit;
+			val = stime->tm_gmtoff;
+			val = (val / 100) * 3600 + (val % 100) * 60;
+			ret = my_itoa( ret, val, 10 );
+			break;
+		case 'z':
+			if( ret >= ml - 5 )
+				goto exit;
+			val = stime->tm_gmtoff;
+			if( val < 0 ) {
+				*ret ++ = '-';
+				val *= -1;
+			}
+			else if( val == 0 ) {
+				FASTSTRCPY( ret, "+0000" );
+				break;
+			}
+			else
+				*ret ++ = '+';
+			if( val < 1000 )
+				*ret ++ = '0';
+			ret = my_itoa( ret, val, 10 );
+			break;
+		case 's':
+			if( ret >= ml - 10 )
+				goto exit;
+			uval = seconds_since_epoch( stime );
+			l = sprintf( ret, "%lu", uval );
+			ret += l;
+			break;
+		case 'D':
+			l = _int_strftime( tv, ret, ml - ret, "%m/%d/%y", stime );
+			ret += l;
+			break;
+		case 'F':
+			l = _int_strftime( tv, ret, ml - ret, "%Y-%m-%d", stime );
+			ret += l;
+			break;
+		case 'R':
+			l = _int_strftime( tv, ret, ml - ret, "%H:%M", stime );
+			ret += l;
+			break;
+		case 'T':
+			l = _int_strftime( tv, ret, ml - ret, "%H:%M:%S", stime );
+			ret += l;
+			break;
+		case 'r':
+			l = _int_strftime( tv, ret, ml - ret, tv->locale.ampm_format, stime );
+			ret += l;
+			break;
+		case 'x':
+			l = _int_strftime( tv, ret, ml - ret, tv->locale.date_format, stime );
+			ret += l;
+			break;
+		case 'X':
+			l = _int_strftime(
+				tv, ret, ml - ret, tv->locale.time_format, stime );
+			ret += l;
+			break;
+		case 'v':
+			l = _int_strftime( tv, ret, ml - ret, "%e-%b-%Y", stime );
+			ret += l;
+			break;
+		case 'c':
+		case '+':
+			l = _int_strftime(
+				tv, ret, ml - ret, tv->locale.datetime_format, stime );
+			ret += l;
+			break;
+		default:
+			*ret++ = '%';
+			if( ret >= ml )
+				goto exit;
+			*ret++ = ch;
 		}
 	}
 exit:
 	*ret = '\0';
-	return (int) ( ret - str );
+	return (int) (ret - str);
 }
 
 /*
@@ -638,10 +763,10 @@ size_t _int_strfmon(
 	...
 ) {
 	my_locale_t *loc = &tv->locale;
-	int step = 0, grouping = 0, plus = 0, currency = 0, justify, width;
+	int step = 0, grouping = 0, plus = 0, currency = 0, justify = 0, width;
 	int swp = 0, lpp = 0, rpp = 0, lprec, rprec, j, fmt;
 	size_t fml, i;
-	char *ret, chf, *ml, fill, swidth[16], slprec[16], srprec[16];
+	char *ret, chf, *ml, fill = 0, swidth[16], slprec[16], srprec[16];
 	char *cptr, *cpt2;
 	double darg;
 	va_list ap;
@@ -715,7 +840,7 @@ size_t _int_strfmon(
 				break;
 			}
 			break;
-		case 2: // left precision
+		case 2: /* left precision */
 			switch( chf ) {
 			case '0': case '1': case '2': case '3': case '4':
 			case '5': case '6': case '7': case '8': case '9':
@@ -728,7 +853,7 @@ size_t _int_strfmon(
 				break;
 			}
 			break;
-		case 3: // right precision
+		case 3: /* right precision */
 			switch( chf ) {
 			case '0': case '1': case '2': case '3': case '4':
 			case '5': case '6': case '7': case '8': case '9':
@@ -772,7 +897,7 @@ calcmon:
 		}
 		else if( plus == 1 )
 			*cptr ++ = loc->positive_sign;
-		else if( plus == 2 || ( currency && lprec > 0 ) )
+		else if( plus == 2 || (currency && lprec > 0) )
 			*cptr ++ = ' ';
 		if( currency ) {
 			if( fmt == 1 ) {
@@ -781,20 +906,20 @@ calcmon:
 						*cptr ++ = loc->currency_symbol[j];
 			}
 			else {
-				if( loc->int_curr_symb_align == 'l' ) {
+				if( loc->curr_symb_align == 'l' ) {
 					for( j = 0; loc->int_curr_symbol[j] != '\0'; j ++ )
 						*cptr ++ = loc->int_curr_symbol[j];
 					*cptr ++ = ' ';
 				}
 			}
 		}
-		cptr = _int_number_format(
+		cptr = _int_number_format2(
 			darg < 0 ? -darg : darg,
 			cptr,
-			(int) ( maxsize - ( cptr - str ) ),
 			rprec,
 			loc->decimal_point,
-			grouping ? loc->thousands_sep : 0,
+			grouping ? loc->thousands_sep : '\0',
+			loc->grouping,
 			'\0',
 			'\0',
 			lprec,
@@ -809,7 +934,7 @@ calcmon:
 				}
 			}
 			else {
-				if( loc->int_curr_symb_align == 'r' ) {
+				if( loc->curr_symb_align == 'r' ) {
 					*cptr ++ = ' ';
 					for( j = 0; loc->int_curr_symbol[j] != '\0'; j ++ )
 						*cptr ++ = loc->int_curr_symbol[j];
@@ -848,10 +973,13 @@ exit:
 }
 
 int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz ) {
+
 	char zfile[256], str[256], *key, *val, *val2, *key2;
 	char *key3, *val3;
 	PerlIO *pfile;
-	int level = 0, len, itmp2, vzip;
+	int level = 0, itmp2, vzip;
+	size_t len;
+	
 	my_vzoneinfo_t *vzi = 0;
 	my_weekdaynum_t *wdn;
 	if( vtz == 0 ) return 0;
@@ -871,7 +999,7 @@ int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz ) {
 		*val ++ = 0;
 		key = str;
 		switch( level ) {
-		case 0: // ROOT
+		case 0: /* ROOT */
 			if( strcmp( key, "BEGIN" ) == 0 ) {
 				if( strcmp( val, "VTIMEZONE" ) == 0 ) {
 					level = 1;
@@ -879,7 +1007,7 @@ int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz ) {
 				}
 			}
 			break;
-		case 1: // VTIMEZONE
+		case 1: /* VTIMEZONE */
 			if( strcmp( key, "END" ) == 0 ) {
 				if( strcmp( val, "VTIMEZONE" ) == 0 ) {
 					level = 0;
@@ -894,7 +1022,7 @@ int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz ) {
 				continue;
 			}
 			break;
-		case 2: // DAYLIGHT/STANDARD
+		case 2: /* DAYLIGHT/STANDARD */
 			if( strcmp( key, "END" ) == 0 ) {
 				if( strcmp( val, "DAYLIGHT" ) == 0
 					|| strcmp( val, "STANDARD" ) == 0
@@ -968,7 +1096,7 @@ int parse_timezone( my_cxt_t *cxt, const char *tz, my_vtimezone_t *vtz ) {
 						}
 					}
 					else {
-						//printf( "Unknown item: %s -> %s\n", key2, val2 );
+						/*printf( "Unknown item: %s -> %s\n", key2, val2 );*/
 					}
 					if( ! key ) break;
 					val = key + 1;
@@ -1023,7 +1151,7 @@ my_vdatetime_t *apply_timezone( my_thread_var_t *tv, time_t *timer ) {
 	time_t tt1, tt2, tt3;
 	my_vdatetime_t *tim, tmz[2], *ctmz1, *ctmz2;
 	int i, leapyear, year, tmz_pos = 0;
-	long days1, days2, days, wday, mday, mdayl;
+	long days1, days2, days, wday, mday;
 
 	if( timer == 0 ) {
 		tt1 = time( 0 );
@@ -1040,10 +1168,9 @@ my_vdatetime_t *apply_timezone( my_thread_var_t *tv, time_t *timer ) {
 
 	year = tim->tm_year + 1900;
 	days = 0;
-	for( i = 1970; i < year; i ++ ) {
-		days += ( ( i % 4 == 0 && i % 100 != 0 ) || i % 400 == 0 ) ? 366 : 365;
-	}
-	leapyear = ( ( year % 4 == 0 && year % 100 != 0 ) || year % 400 == 0 );
+	for( i = 1970; i < year; i ++ )
+		days += ((i % 4 == 0 && i % 100 != 0) || i % 400 == 0) + 365;
+	leapyear = ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0);
 
 	for( tmz_pos = 0; tmz_pos < 2; tmz_pos ++ ) {
 		vzi = &vtz->zoneinfo[tmz_pos];
@@ -1060,19 +1187,19 @@ my_vdatetime_t *apply_timezone( my_thread_var_t *tv, time_t *timer ) {
 		switch( vzi->rr_frequency ) {
 		case 0:
 			break;
-		case 1: // FREQ::YEARLY
-			// BYMONTH
+		case 1: /* FREQ::YEARLY */
+			/* BYMONTH */
 			days1 = days;
 			for( i = 0; i < 12; i ++ ) {
-				days2 = days1 + ( i == 2 && leapyear ? mday_array[i] : mday_array[i] - 1 );
-				if( ! vzi->rr_bymonth[i] || tim->tm_mon < i ) goto rrbymonthnext;
+				mday = ( i == 1 && leapyear ) ? 29 : mday_array[i];
+				days2 = days1 + mday - 1;
+				if( ! vzi->rr_bymonth[i] || tim->tm_mon < i )
+				    goto rrbymonthnext;
 				ctmz1->tm_mon = i;
-				mdayl = ( i == 2 && leapyear ) ? mday_array[i] + 1 : mday_array[i];
-				// BYDAY
+				/* BYDAY */
 				vwdn = &vzi->rr_byday;
 				if( vwdn ) {
 					if( vwdn->ordwk < 0 ) {
-						mday = mdayl;
 						wday = ( days2 % 7 ) + 4;
 						if( wday > 6 ) wday -= 7;
 						while( wday != vwdn->day ) {
@@ -1126,7 +1253,8 @@ usetmz2:
 calczone:
 	tim->tm_gmtoff = ctmz1->tm_gmtoff;
 	tim->tm_zone = ctmz1->tm_zone;
-	if( ( i = tim->tm_gmtoff ) == 0 ) goto exit;
+	if( (i = tim->tm_gmtoff) == 0 )
+		goto exit;
 	tim->tm_min += i % 100;
 	tim->tm_hour += i / 100;
 	if( i < 0 ) {
@@ -1147,7 +1275,7 @@ calczone:
 			if( tim->tm_mon == 0 ) {
 				tim->tm_mon = 11;
 				tim->tm_year --;
-				tim->tm_yday = ( ( tim->tm_year % 4 == 0 && tim->tm_year % 100 != 0 ) || tim->tm_year % 400 == 0 ) ? 365 : 364;
+				tim->tm_yday = ((tim->tm_year % 4 == 0 && tim->tm_year % 100 != 0) || tim->tm_year % 400 == 0) + 364;
 			}
 			else {
 				tim->tm_mon --;
@@ -1170,7 +1298,7 @@ calczone:
 				tim->tm_wday ++;
 		}
 		i = tim->tm_mon == 1
-			&& ( ( tim->tm_year % 4 == 0 && tim->tm_year % 100 != 0 ) || tim->tm_year % 400 == 0 )
+			&& ((tim->tm_year % 4 == 0 && tim->tm_year % 100 != 0) || tim->tm_year % 400 == 0)
 				? 29 : mday_array[tim->tm_mon];
 		if( tim->tm_mday > i ) {
 			if( tim->tm_mon == 11 ) {
@@ -1187,36 +1315,95 @@ exit:
 	return tim;
 }
 
-double _my_round( double num, int prec ) {
-	if( prec > ROUND_PREC_MAX )
-		prec = ROUND_PREC_MAX;
-	else if( prec < 0 )
-		prec = 0;
-	return floor( num * ROUND_PREC[prec] + 0.5 ) / ROUND_PREC[prec];
+char *_int_number_format2( double val, char *str, int fd, char dp,
+	char ts, const char *grp, char ns, char ps, int zf, char fc
+) {
+	long a, b, i;
+	char *s1, *s2, *s3;
+	
+	// round to fractional digits
+	if( val < 0 ) {
+		*str ++ = ns == 0 ? '-' : ns;
+		val = my_round( -val, fd );
+	}
+	else {
+		if( ps )
+			*str ++ = ps;
+		val = my_round( val, fd );
+	}
+	// get integer part
+	a = (long) val;
+	// zero fill
+	if( zf != 0 ) {
+		// calc length of integer value
+		for( b = a, i = 1; b > 10; b /= 10, i ++ );
+		// fill zero char
+		if( fc == 0 )
+			fc = ' ';
+		for( i = zf - i; i > 0; *str ++ = fc, i -- );
+	}
+	// convert integer part to string
+	s1 = my_itoa( str, a, 10 );
+	// group digits
+	if( ts != 0 && *grp > 0 ) {
+		// count group chars
+		s3 = (char *) grp;
+		for( s2 = s1 - 1, i = *s3, b = 0; i != -1; s3 ++, i = *s3, b ++ ) {
+			if( i == -2 )
+				s3 --, i = *s3;
+			s2 -= i;
+			if( s2 < str )
+				break;
+		}
+		// write group chars
+		s2 = s1 - 1, s1 = s1 + b, s3 = s1 - 1;
+		for( i = *grp; i != -1 && b > 0; grp ++, i = *grp, b -- ) {
+			if( i == -2 )
+				grp --, i = *grp;
+			for( ; i > 0; *s3 -- = *s2 --, i -- );
+			*s3 -- = ts;
+		}
+	}
+	// write fractional digits
+	if( fd > 0 ) {
+		*s1 ++ = dp == 0 ? '.' : dp;
+		b = (long) pow( 10, fd );
+		a = (long) floor( (val - a) * (double) b + 0.5 );
+		if( a > 0 ) {
+			for( b /= 10; a < b; *s1 ++ = '0', b /= 10, fd -- );
+			s2 = my_itoa( s1, a, 10 );
+			fd -= s2 - s1, s1 = s2;
+		}
+		for( ; fd > 0; *s1 ++ = '0', fd -- );
+	}
+	*s1 = '\0';
+	return s1;
 }
 
-// original by Will Bateman (March 2005) / GPL License
+/* original by Will Bateman (March 2005) / GPL License */
 
 char *_int_number_format( double value, char *str, int maxlen, int fd, char dp,
 	char ts, char ns, char ps, int zf, char fc
 ) {
-	long i, j, k, count;
+	long i, j, count, k;
 	double val;
 	long a, b;
 	char *number, *tmp, *p2;
 	
 	assert( fd >= 0 );
 	assert( fd <= 19 );
-	if( ns == 0 ) ns = '-';
-	if( dp == 0 ) dp = ',';
+	if( ns == 0 )
+		ns = '-';
+	if( dp == 0 )
+		dp = ',';
 	number = str;
 	if( value < 0 ) {
 		*number ++ = ns;
-		val = _my_round( -value, fd );
+		val = my_round( -value, fd );
 	}
 	else {
 		if( ps ) *number ++ = ps;
-		val = _my_round( value, fd );
+		val = my_round( value, fd );
 	}
 	
 	a = (int) floor( val );
@@ -1230,7 +1417,8 @@ char *_int_number_format( double value, char *str, int maxlen, int fd, char dp,
 		tmp = number;
 		if( ( j = zf - j ) > 0 ) {
 			if( fc == 0 ) fc = '0';
-			while( j -- ) *tmp ++ = fc;
+			while( j -- )
+				*tmp ++ = fc;
 		}
 		p2 = tmp;
 		tmp = my_itoa( tmp, a, 10 );
@@ -1241,7 +1429,7 @@ char *_int_number_format( double value, char *str, int maxlen, int fd, char dp,
 	}
 	
 	if( ts != 0 ) {
-		i = tmp - str - ( str[0] == ns || ps != 0 );
+		i = (long) (tmp - str - (str[0] == ns || ps != 0));
 		j = ( i - 1 ) / 3;
 		for( k = i + j, count = -1; k >= 0 && j > 0; k --, count ++ ) {
 			if( count == 3 ) {
@@ -1259,7 +1447,7 @@ char *_int_number_format( double value, char *str, int maxlen, int fd, char dp,
 		*tmp ++ = dp;
 		
 		j = (long) pow( 10.0, fd );
-		a = (long) floor( ( val - a ) * (double) j + 0.5 );
+		a = (long) floor( (val - a) * (double) j + 0.5 );
 		
 		if( a > 0 ) {
 			j /= 10;
@@ -1282,7 +1470,34 @@ char *_int_number_format( double value, char *str, int maxlen, int fd, char dp,
 	return tmp;
 }
 
-char *my_strncpy( char *dst, const char *src, unsigned long len ) {
+DWORD get_current_thread_id() {
+#ifdef USE_THREADS
+#ifdef _WIN32
+	return GetCurrentThreadId();
+#else
+	return (DWORD) pthread_self();
+#endif
+#else
+	return 0;
+#endif
+}
+
+const double ROUND_PREC[] = {
+	1, 10, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12
+	, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19
+};
+const int ROUND_PREC_MAX = 1 + (int) ARRAY_LEN( ROUND_PREC );
+
+double my_round( double num, int prec ) {
+	if( prec > ROUND_PREC_MAX )
+		prec = ROUND_PREC_MAX;
+	else
+	if( prec < 0 )
+		prec = 0;
+	return floor( num * ROUND_PREC[prec] + 0.5 ) / ROUND_PREC[prec];
+}
+
+char *my_strncpy( char *dst, const char *src, size_t len ) {
 	char ch;
 	for( ; len > 0; len -- ) {
 		if( ( ch = *src ++ ) == '\0' ) {
@@ -1308,103 +1523,57 @@ char *my_strcpy( char *dst, const char *src ) {
 	return dst;
 }
 
-char *my_strrev( char *str, size_t len ) {
-	char *p1, *p2;
-	if( ! str || ! *str ) return str;
-	for( p1 = str, p2 = str + len - 1; p2 > p1; ++ p1, -- p2 ) {
-		*p1 ^= *p2;
-		*p2 ^= *p1;
-		*p1 ^= *p2;
+int my_stricmp( const char *cs, const char *ct ) {
+	register signed char res;
+	while( 1 ) {
+		if( (res = toupper( *cs ) - toupper( *ct ++ )) != 0 || ! *cs ++ )
+			break;
 	}
+	return res;
+}
+
+char *_my_itoa( register char *str, long value, int radix ) {
+	int rem = (int) (value % radix);
+	value /= radix;
+	/* output digits of val/base first */
+	if( value > 0 )
+		str = _my_itoa( str, value, radix );
+	/* output last digit */
+	*str++ = "0123456789abcdefghijklmnopqrstuvwxyz"[rem];
 	return str;
 }
 
-char *my_itoa( char *str, long value, int radix ) {
-	int rem;
-	char *ret = str;
-	switch( radix ) {
-	case 16:
-		do {
-			rem = value % 16;
-			value /= 16;
-			switch( rem ) {
-			case 10:
-				*ret ++ = 'A';
-				break;
-			case 11:
-				*ret ++ = 'B';
-				break;
-			case 12:
-				*ret ++ = 'C';
-				break;
-			case 13:
-				*ret ++ = 'D';
-				break;
-			case 14:
-				*ret ++ = 'E';
-				break;
-			case 15:
-				*ret ++ = 'F';
-				break;
-			default:
-				*ret ++ = (char) ( rem + 0x30 );
-				break;
-			}
-		} while( value != 0 );
-		break;
-	default:
-		do {
-			rem = value % radix;
-			value /= radix;
-			*ret ++ = (char) ( rem + 0x30 );
-		} while( value != 0 );
+char *my_itoa( register char *str, long value, int radix ) {
+	if( radix > 36 || radix < 2 )
+		radix = 10;
+	if( value < 0 ) {
+		*str++ = '-';
+		value = -value;
 	}
-	*ret = '\0' ;
-	my_strrev( str, ret - str );
-	return ret;
+	str = _my_itoa( str, value, radix );
+	*str = '\0';
+	return str;
 }
 
-char *my_ltoa( char *str, XLONG value, int radix ) {
-	int rem;
-	char *ret = str;
-	switch( radix ) {
-	case 16:
-		do {
-			rem = value % 16;
-			value /= 16;
-			switch( rem ) {
-			case 10:
-				*ret ++ = 'A';
-				break;
-			case 11:
-				*ret ++ = 'B';
-				break;
-			case 12:
-				*ret ++ = 'C';
-				break;
-			case 13:
-				*ret ++ = 'D';
-				break;
-			case 14:
-				*ret ++ = 'E';
-				break;
-			case 15:
-				*ret ++ = 'F';
-				break;
-			default:
-				*ret ++ = (char) ( rem + 0x30 );
-				break;
-			}
-		} while( value != 0 );
-		break;
-	default:
-		do {
-			rem = value % radix;
-			value /= radix;
-			*ret ++ = (char) ( rem + 0x30 );
-		} while( value != 0 );
+char *_my_ltoa( register char *str, XLONG value, int radix ) {
+	int rem = (int) (value % radix);
+	value /= radix;
+	/* output digits of val/base first */
+	if( value > 0 )
+		str = _my_ltoa( str, value, radix );
+	/* output last digit */
+	*str++ = "0123456789abcdefghijklmnopqrstuvwxyz"[rem];
+	return str;
+}
+
+char *my_ltoa( register char *str, XLONG value, int radix ) {
+	if( radix > 36 || radix < 2 )
+		radix = 10;
+	if( value < 0 ) {
+		*str++ = '-';
+		value = -value;
 	}
-	*ret = '\0' ;
-	my_strrev( str, ret - str );
-	return ret;
+	str = _my_itoa( str, value, radix );
+	*str = '\0';
+	return str;
 }

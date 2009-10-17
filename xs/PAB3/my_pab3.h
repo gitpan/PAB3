@@ -12,21 +12,21 @@
 #ifdef _WIN32
 #undef vsnprintf
 #define vsnprintf _vsnprintf
-#endif
-
+#else
 #undef BYTE
 #define BYTE unsigned char
 #undef WORD
 #define WORD unsigned short
 #undef DWORD
 #define DWORD unsigned long
+#endif
 
 #undef XLONG
 #undef UXLONG
-#if defined __unix__
+#if defined __GNUC__ || defined __unix__ || defined __CYGWIN__ || defined __sun
 #	define XLONG long long
 #	define UXLONG unsigned long long
-#elif defined __WIN__
+#elif defined _WIN32
 #	define XLONG __int64
 #	define UXLONG unsigned __int64
 #else
@@ -101,7 +101,7 @@ typedef struct st_my_hashmap_def {
 	char						*record;
 	size_t						record_length;
 	char						**fields;
-	size_t						field_count;
+	DWORD						field_count;
 } my_hashmap_def_t;
 
 typedef struct st_my_parser_session {
@@ -174,13 +174,13 @@ static const my_thread_var_t THREADVAR_DEFAULT = {
 
 const char *my_stristr( const char *str, const char *pattern );
 int my_stricmp( const char *cs, const char *ct );
-char *my_strncpyu( char *dst, const char *src, unsigned long len );
+char *my_strncpyu( char *dst, const char *src, size_t len );
 char *_my_strcpy( char *dst, const char *src );
 #ifdef DEBUG
 char *_my_strcpy_dbg( char *dst, const char *src, const char *file, int line );
 #endif
-char *my_strncpy( char *dst, const char *src, unsigned long len );
-char* my_itoa( char* str, int value, int radix );
+char *my_strncpy( char *dst, const char *src, size_t len );
+char* my_itoa( char* str, long value, int radix );
 
 my_thread_var_t *my_thread_var_add( my_cxt_t *cxt, SV *sv );
 void my_thread_var_free( my_thread_var_t *tv );
@@ -201,7 +201,7 @@ void my_hashmap_rem( my_thread_var_t *tv, my_hashmap_def_t *hd );
 void my_hashmap_free( my_hashmap_def_t *hd );
 void my_hashmap_cleanup( my_thread_var_t *tv );
 
-int parse_template( my_thread_var_t *tv, const char *tpl, size_t len, int setpath );
+int parse_template( my_thread_var_t *tv, const char *tpl, int len, int setpath );
 void my_parser_session_cleanup( my_thread_var_t *tv );
 void my_parser_item_cleanup( my_thread_var_t *tv );
 void my_parser_item_free( my_parser_item_t *pi );
@@ -211,27 +211,51 @@ int build_script( my_thread_var_t *tv );
 void optimize_script( my_thread_var_t *tv, my_parser_item_t *parent );
 
 #ifdef DEBUG
-//#define Newx(v,n,t)	(v = (MEM_WRAP_CHECK_(n,t) (t*)safemalloc((MEM_SIZE)((n)*sizeof(t)))))
+
 #undef New
+#undef Newz
+#undef Newx
+#undef Newxz
+#undef Renew
+#undef Safefree
+#undef Copy
+
 #define New(x,v,n,t) \
 	v = (t *) safemalloc( (size_t)((n) * sizeof(t)) ); \
 	_debug( "0x%08x New(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ );
-//	  (v = (MEM_WRAP_CHECK_(n,t) (t*)saferealloc((Malloc_t)(v),(MEM_SIZE)((n)*sizeof(t)))))
-#undef Renew
+
+#define Newz(x,v,n,t) \
+{ \
+	v = (t *) safemalloc( (size_t)((n) * sizeof(t)) ); \
+	Zero( (v), (n), t ); \
+	_debug( "0x%08x Newz(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ ); \
+}
+
+#define Newx(v,n,t) \
+	v = (t *) safemalloc( (size_t)((n) * sizeof(t)) ); \
+	_debug( "0x%08x Newx(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ );
+
+#define Newxz(v,n,t) \
+{ \
+	v = (t *) safemalloc( (size_t)((n) * sizeof(t)) ); \
+	Zero( (v), (n), t ); \
+	_debug( "0x%08x Newxz(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ ); \
+}
+
 #define Renew(v,n,t) \
 	v = (t *) saferealloc( (Malloc_t)(v), (size_t)((n) * sizeof(t)) ); \
 	_debug( "0x%08x Renew(%u x %u) called at %s:%d\n", v, (n), sizeof(t), __FILE__, __LINE__ );
-#undef Safefree
+
 #define Safefree(d) \
 	if( (d) != NULL ) { \
 		_debug( "0x%08x Safefree called at %s:%d\n", (d), __FILE__, __LINE__ ); \
 		safefree( (Malloc_t)(d) ); \
 	}
-//(MEM_WRAP_CHECK_(n,t) (void)memcpy((char*)(d),(const char*)(s), (n) * sizeof(t)))
-#undef Copy
+
 #define Copy(s,d,n,t) \
-	(void)memcpy( (char*)(d), (const char*)(s), (n) * sizeof(t) ); \
+	memcpy( (char *)(d), (const char *)(s), (n) * sizeof(t) ); \
 	_debug( "0x%08x Copy %u x %u from 0x%08x at %s:%d\n", (d), (n), sizeof(t), (s), __FILE__, __LINE__ );
+
 #endif
 
 #endif

@@ -1,4 +1,4 @@
-grp:3
+grp:3;3
 fd:2
 ifd:2
 dp:,
@@ -6,15 +6,17 @@ ts:.
 cs:€
 ics:EUR
 csa:r
-ica:r
+css:1
 ns:-
 ps:+
-ldf:%a %d %b %Y
-sdf:%d.%m.%Y
-ltf:%H:%M:%S %Z
-stf:%H:%M
-ams:
-pms:
+dtf:%a %d %b %Y %H:%M:%S %Z
+df:%d.%m.%Y
+tf:%H:%M:%S
+apf:
+amu:
+pmu:
+aml:
+pml:
 lm1:Januar
 lm2:Februar
 lm3:März

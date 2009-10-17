@@ -183,7 +183,7 @@ sub selectall_arrayref {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	return $this->fetchall_arrayref( $res->[$DB_QUERYID], $st1 );
+	return $res->fetchall_arrayref( $st1 );
 }
 
 sub selectall_hashref {
@@ -199,7 +199,7 @@ sub selectall_hashref {
 		$res = $this->query( $sql )
 			or return undef;
 	}
-	return $this->fetchall_hashref( $key, $res->[$DB_QUERYID] );
+	return $res->fetchall_hashref( $key );
 }
 
 sub selectcol_arrayref {

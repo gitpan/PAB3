@@ -8,12 +8,12 @@ use strict;
 use warnings;
 no warnings 'uninitialized';
 
-use vars qw($VERSION $TID $PU_TID);
+use vars qw($VERSION $TID);
 
 require Exporter;
 our @EXPORT_GOOD = qw(
 	setlocale set_locale set_user_locale set_timezone
-	strftime strfmon number_format str_trim round
+	strftime strfmon number_format str_trim trim round
 );
 our @EXPORT_BAD = qw(localtime gmtime);
 our @EXPORT_OK = ( @EXPORT_GOOD, @EXPORT_BAD );
@@ -23,23 +23,23 @@ our %EXPORT_TAGS = (
 *import = \&Exporter::import;
 
 BEGIN {
-	$VERSION = '1.0.2';
+	$VERSION = '2.0';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	
-	my( $fp, $pn );
+	my( $pn );
 	$pn = '/auto/PAB3/Utils/';
 	foreach( @INC ) {
-		if( -d ( $fp = $_ . $pn ) ) {
-			&_set_module_path( $fp );
+		if( -d $_ . $pn . 'locale' ) {
+			&_set_module_path( $_ . $pn );
 			last;
 		}
 	}
 	
-	$PU_TID = 0;
 	$TID = undef;
 	
 	*setlocale = \&set_locale;
+	*trim = \&str_trim;
 }
 
 END {
@@ -48,19 +48,10 @@ END {
 
 1;
 
-sub new {
-	my $proto = shift;
-	my $class = ref( $proto ) || $proto;
-	my $this  = [];
-	bless( $this, $class );
-	$this->[$PU_TID] = &_get_address( $this );
-	return $this;
-}
-
 sub DESTROY {
 	my $this = shift or return;
-	if( $this->[$PU_TID] ) {
-		&_cleanup_class( $this->[$PU_TID] );
+	if( $$this ) {
+		&_cleanup_class( $$this );
 	}
 }
 
@@ -100,11 +91,11 @@ sub strfmon {
 }
 
 sub get_thread_id {
-	my( $arg ) = @_;
-	if( ref( $arg->[0] ) eq __PACKAGE__ ) {
-		return ( shift @$arg )->[$PU_TID];
+	#my( $arg ) = @_;
+	if( ref( $_[0]->[0] ) eq __PACKAGE__ ) {
+		return ${shift @{$_[0]}};
 	}
-	defined $TID or $TID = $threads::VERSION ? threads->self->tid() : 0;
+	defined $TID or $TID = &_get_current_thread_id();
 	return $TID;
 }
 
@@ -256,23 +247,24 @@ long version:
 
   'dp'  or 'decimal_point'         => decimal point character
   'ts'  or 'thousands_sep'         => thousands separator
-  'grp' or 'grouping'              => numeric grouping, default is 3
+  'grp' or 'grouping'              => numeric grouping, (i.e. [3, 2])
   'cs'  or 'currency_symbol'       => local currency symbol (i.e. $)
   'ics' or 'int_curr_symbol'       => international currency symbol (i.e. USD)
   'csa' or 'curr_symb_align'       => local currency symbol alignment
-                                      'l' for left or 'r' for right
-  'ica' or 'int_curr_symb_align'   => international currency symbol alignment
-                                      'l' for left or 'r' for right
+                                      'l' for left, 'r' for right
+  'css' or 'curr_symb_space'       => currency symbol space, true or false
   'fd'  or 'frac_digits'           => local fractional digits
   'ifd' or 'int_frac_digits'       => international fractional digits
   'ns'  or 'negative_sign'         => sign for negative values
   'ps'  or 'positive_sign'         => sign for positive values
-  'ams' or 'am_string'             => A.M. string (i.e. AM)
-  'pms' or 'pm_string'             => P.M. string (i.e. PM)
-  'sdf' or 'short_date_format'     => short date format (i.e. %m/%d/%Y)
-  'ldf' or 'long_date_format'      => long date format (i.e. %a %b %d %Y)
-  'stf' or 'short_time_format'     => short time format (i.e. %H:%M)
-  'ltf' or 'long_time_format'      => long time format (i.e. %H:%M:%S)
+  'aml' or 'am_lower'              => A.M. string in lower case (i.e. am)
+  'pml' or 'pm_lower'              => P.M. string in lower case (i.e. pm)
+  'amu' or 'am_upper'              => A.M. string in upper case (i.e. AM)
+  'pmu' or 'pm_upper'              => P.M. string in upper case (i.e. PM)
+  'apf' or 'ampm_format'           => am/pm format string (i.e. %I:%M:%S %p)
+  'df' or 'date_format'            => date format (i.e. %m/%d/%Y)
+  'tf' or 'time_format'            => time format (i.e. %H:%M:%S)
+  'dtf' or 'datetime_format'       => datetime format (i.e. %a %d %b %Y %r %Z)
   'sdn' or 'short_day_names'       => array with short day names
   'ldn' or 'long_day_names'        => array with long day names
   'smn' or 'short_month_names'     => array with short month names
@@ -287,28 +279,30 @@ B<Example>
   my %locale = (
       'dp'  => '.',
       'ts'  => ',',
-      'grp' => 3,
+      'grp' => [3, 3],
       'cs'  => '$',
       'ics' => 'USD',
       'csa' => 'l',
-      'ica' => 'l',
+      'css' => 0,
       'fd'  => 2,
       'ifd' => 2,
       'ns'  => '-',
       'ps'  => '+',
-      'ams' => 'am',
-      'pms' => 'pm',
-      'sdf' => '%m/%d/%Y',
-      'ldf' => '%a %b %d %Y',
-      'stf' => '%H.%M',
-      'ltf' => '%H.%M.%S',
-      'sdn' => [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ],
-      'ldn' => [ 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
-                 'Friday', 'Saturday' ],
-      'smn' => [ 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-                 'Oct', 'Nov', 'Dec' ],
-      'lmn' => [ 'January', 'February', 'March', 'April', 'May', 'June', 'July',
-                 'August', 'September', 'October', 'November', 'December' ],
+      'aml' => 'am',
+      'pml' => 'pm',
+      'amu' => 'AM',
+      'pmu' => 'PM',
+	  'apf' => '%I:%M:%S %p',
+      'df'  => '%m/%d/%Y',
+      'tf'  => '%H:%M:%S',
+	  'dtf' => '%a %d %b %Y %r %Z',
+      'sdn' => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      'ldn' => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
+                'Friday', 'Saturday'],
+      'smn' => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+                'Oct', 'Nov', 'Dec'],
+      'lmn' => ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+                'August', 'September', 'October', 'November', 'December'],
   );
   
   set_user_locale( \%locale );
@@ -761,6 +755,8 @@ B<Examples>
 Returns the rounded value of val to specified precision
 (number of digits after the decimal point). Default precision is 0. 
 
+
+=item trim ( $str )
 
 =item str_trim ( $str )
 

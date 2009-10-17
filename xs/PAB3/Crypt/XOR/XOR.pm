@@ -10,7 +10,7 @@ no strict 'refs';
 use vars qw($VERSION @EXPORT_FNC);
 
 BEGIN {
-	$VERSION = '1.1.0';
+	$VERSION = '1.01';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 

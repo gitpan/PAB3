@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Europe/Isle_of_Man
+TZID:/navalla.org/20071203_1/Europe/Isle_of_Man
 X-LIC-LOCATION:Europe/Isle_of_Man
 BEGIN:DAYLIGHT
 TZOFFSETFROM:+0000

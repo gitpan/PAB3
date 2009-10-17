@@ -63,6 +63,10 @@ WriteMakefile(
     },
     XSPROTOARG => '-prototypes',
     OPTIMIZE => '-O3',
+	OBJECT => '',
+	XS => {},
+	C => [],
+	H => [],
     DIR => [ 'xs' ],
 );
 

@@ -15,7 +15,46 @@ BOOT:
 	MY_CXT_INIT;
 	MY_CXT.threads = MY_CXT.last_thread = NULL;
 	MY_CXT.locale_alias = NULL;
+	MY_CXT.state = 1;
+#ifdef USE_ITHREADS
+	MUTEX_INIT( &MY_CXT.thread_lock );
+	MY_CXT.perl = aTHX;
+#endif
 }
+
+
+#/*****************************************************************************
+# * _cleanup()
+# *****************************************************************************/
+
+void
+_cleanup( ... )
+PREINIT:
+	dMY_CXT;
+CODE:
+	(void) items; /* avoid compiler warning */
+	if( MY_CXT.perl != aTHX )
+		XSRETURN_EMPTY;
+	cleanup_my_utils( &MY_CXT );
+#ifdef USE_ITHREADS
+	MUTEX_DESTROY( &MY_CXT.thread_lock );
+#endif
+	MY_CXT.state = 0;
+	
+
+
+#/*****************************************************************************
+# * CLONE( ... )
+# *****************************************************************************/
+
+#if defined(USE_ITHREADS) && defined(MY_CXT_KEY)
+
+void
+CLONE( ... )
+CODE:
+	MY_CXT_CLONE;
+
+#endif
 
 
 #/*****************************************************************************
@@ -35,6 +74,18 @@ OUTPUT:
 
 
 #/*****************************************************************************
+# * _get_current_thread_id()
+# *****************************************************************************/
+
+unsigned long
+_get_current_thread_id()
+CODE:
+	RETVAL = get_current_thread_id();
+OUTPUT:
+	RETVAL
+
+
+#/*****************************************************************************
 # * _set_module_path( path )
 # *****************************************************************************/
 
@@ -43,12 +94,12 @@ _set_module_path( mpath )
 	SV *mpath;
 PREINIT:
 	dMY_CXT;
-	int i;
-	STRLEN len;
+	STRLEN i, len;
 	char *path, *s1, *s2;
 CODE:
 	path = SvPVx( mpath, len );
 	//fprintf( stderr, "set module path [%s]\n", path );
+	MY_CXT_LOCK;
 	s1 = MY_CXT.locale_path;
 	s2 = MY_CXT.zoneinfo_path;
 	for( i = len; i > 0; i -- ) {
@@ -63,6 +114,25 @@ CODE:
 	MY_CXT.locale_path_length = (int) ( s1 - MY_CXT.locale_path );
 	MY_CXT.zoneinfo_path_length = (int) ( s2 - MY_CXT.zoneinfo_path );
 	read_locale_alias( &MY_CXT );
+	MY_CXT_UNLOCK;
+
+
+#/*****************************************************************************
+# * new( class, ... )
+# *****************************************************************************/
+
+void
+new( class, ... )
+	SV *class;
+PREINIT:
+	dMY_CXT;
+	SV *sv;
+	HV *hv;
+PPCODE:
+	sv = sv_2mortal( newSVuv( 0 ) );
+	SvUV_set( sv, (size_t) sv );
+	hv = gv_stashpv( SvPVX( class ), FALSE );
+	XPUSHs( sv_bless( sv_2mortal( newRV( sv ) ), hv ) );
 
 
 #/*****************************************************************************
@@ -76,7 +146,6 @@ PREINIT:
 	STRLEN lstr, p1, p2;
 	char *sstr, ch;
 CODE:
-	//lstr = SVLEN( string );
 	sstr = SvPVx( string, lstr );
 	for( p1 = 0; p1 < lstr; p1 ++ ) {
 		ch = sstr[p1];
@@ -86,12 +155,7 @@ CODE:
 		ch = sstr[p2];
 		if( ! ISWHITECHAR( ch ) ) break;
 	}
-	if( p1 == 0 && p2 == lstr - 1 ) {
-		ST(0) = sv_2mortal( newSVpvn( sstr, lstr ) );
-	}
-	else {
-		ST(0) = sv_2mortal( newSVpvn( &sstr[p1], p2 - p1 + 1 ) );
-	}
+	ST(0) = sv_2mortal( newSVpvn( &sstr[p1], p2 - p1 + 1 ) );
 
 
 #/*****************************************************************************
@@ -113,7 +177,7 @@ CODE:
 		else if( prec < 0 )
 			prec = 0;
 	}
-	RETVAL = floor( num * ROUND_PREC[prec] + 0.5 ) / ROUND_PREC[prec]; 
+	RETVAL = floor( num * ROUND_PREC[prec] + (num < 0.0 ? -0.5 : 0.5) ) / ROUND_PREC[prec];
 OUTPUT:
 	RETVAL
 
@@ -134,12 +198,12 @@ CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
 	for( i = 1; i < items; i ++ ) {
 		str = (const char *) SvPV_nolen( ST(i) );
-		if( ( str = get_locale_format_settings( &MY_CXT, str, &tv->locale ) ) ) {
+		if( (str = get_locale_format_settings( &MY_CXT, str, &tv->locale )) ) {
 			RETVAL = str;
 			goto exit;
 		}
 	}
-	RETVAL = 0;
+	RETVAL = NULL;
 exit:
 OUTPUT:
 	RETVAL
@@ -157,175 +221,272 @@ PREINIT:
 	dMY_CXT;
 	my_thread_var_t *tv;
 	my_locale_t *loc;
-	SV **svp;
-	STRLEN vlen;
 	AV *av;
-	int i;
+	SV *sv, **psv;
+	I32 rlen, i;
+	char *key;
 CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
 	loc = &tv->locale;
-	if( ( svp = hv_fetch( hash_ref, "grp", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "grouping", 8, 0 ) ) != 0
-	)
-		loc->grouping = (char) SvIV( *svp );
-	if(
-		( svp = hv_fetch( hash_ref, "fd", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "frac_digits", 11, 0 ) ) != 0
-	)
-		loc->frac_digits = (char) SvIV( *svp );
-	if(
-		( svp = hv_fetch( hash_ref, "ifd", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "int_frac_digits", 15, 0 ) ) != 0
-	)
-		loc->int_frac_digits = (char) SvIV( *svp );
-	if(
-		( svp = hv_fetch( hash_ref, "dp", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "decimal_point", 13, 0 ) ) != 0
-	)
-		loc->decimal_point = ( SvPVx( *svp, vlen ) )[0];
-	if( ( svp = hv_fetch( hash_ref, "ts", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "thousands_sep", 13, 0 ) ) != 0
-	)
-		loc->thousands_sep = ( SvPVx( *svp, vlen ) )[0];
-	if(
-		( svp = hv_fetch( hash_ref, "cs", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "currency_symbol", 15, 0 ) ) != 0
-	)
-		strncpy(
-			loc->currency_symbol,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->currency_symbol )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "ics", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "int_curr_symbol", 15, 0 ) ) != 0
-	)
-		strncpy(
-			loc->int_curr_symbol,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->int_curr_symbol )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "csa", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "curr_symb_align", 17, 0 ) ) != 0
-	)
-		loc->curr_symb_align = ( SvPVx( *svp, vlen ) )[0];
-	if(
-		( svp = hv_fetch( hash_ref, "ica", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "int_curr_symb_align", 21, 0 ) ) != 0
-	)
-		loc->int_curr_symb_align = ( SvPVx( *svp, vlen ) )[0];
-	if(
-		( svp = hv_fetch( hash_ref, "ns", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "negative_sign", 13, 0 ) ) != 0
-	)
-		loc->negative_sign = ( SvPVx( *svp, vlen ) )[0];
-	if(
-		( svp = hv_fetch( hash_ref, "ps", 2, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "positive_sign", 13, 0 ) ) != 0
-	)
-		loc->positive_sign = ( SvPVx( *svp, vlen ) )[0];
-	if(
-		( svp = hv_fetch( hash_ref, "sdf", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "short_date_format", 17, 0 ) ) != 0
-	)
-		strncpy(
-			loc->short_date_format,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->short_date_format )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "ldf", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "long_date_format", 16, 0 ) ) != 0
-	)
-		strncpy(
-			loc->long_date_format,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->long_date_format )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "stf", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "short_time_format", 17, 0 ) ) != 0
-	)
-		strncpy(
-			loc->short_time_format,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->short_time_format )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "ltf", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "long_time_format", 16, 0 ) ) != 0
-	)
-		strncpy(
-			loc->long_time_format,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->long_time_format )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "ams", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "am_string", 9, 0 ) ) != 0
-	)
-		strncpy(
-			loc->time_am_string,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->time_am_string )
-		);
-	if(
-		( svp = hv_fetch( hash_ref, "pms", 3, 0 ) ) != 0
-		|| ( svp = hv_fetch( hash_ref, "pm_string", 9, 0 ) ) != 0
-	)
-		strncpy(
-			loc->time_pm_string,
-			SvPVx( *svp, vlen ),
-			sizeof( loc->time_pm_string )
-		);
-	svp = hv_fetch( hash_ref, "sdn", 3, 0 );
-	if( svp == 0 ) svp = hv_fetch( hash_ref, "short_day_names", 15, 0 );
-	if( svp != 0 && SvTYPE( SvRV( *svp ) ) == SVt_PVAV ) {
-		av = (AV*) SvRV( *svp );
-		for( i = 0; i < 7; i ++ )
-			if( ( svp = av_fetch( av, i, 0 ) ) != 0 )
-				strncpy(
-					loc->short_day_names[i],
-					SvPVx( *svp, vlen ),
-					sizeof( loc->short_day_names[i] )
-				);
-	}
-	svp = hv_fetch( hash_ref, "ldn", 3, 0 );
-	if( svp == 0 ) svp = hv_fetch( hash_ref, "long_day_names", 14, 0 );
-	if( svp != 0 && SvTYPE( SvRV( *svp ) ) == SVt_PVAV ) {
-		av = (AV*) SvRV( *svp );
-		for( i = 0; i < 7; i ++ )
-			if( ( svp = av_fetch( av, i, 0 ) ) != 0 )
-				strncpy(
-					loc->long_day_names[i],
-					SvPVx( *svp, vlen ),
-					sizeof( loc->long_day_names[i] )
-				);
-	}
-	svp = hv_fetch( hash_ref, "smn", 3, 0 );
-	if( svp == 0 ) svp = hv_fetch( hash_ref, "short_month_names", 17, 0 );
-	if( svp != 0 && SvTYPE( SvRV( *svp ) ) == SVt_PVAV ) {
-		av = (AV*) SvRV( *svp );
-		for( i = 0; i < 12; i ++ )
-			if( ( svp = av_fetch( av, i, 0 ) ) != 0 )
-				strncpy(
-					loc->short_month_names[i],
-					SvPVx( *svp, vlen ),
-					sizeof( loc->short_month_names[i] )
-				);
-	}
-	svp = hv_fetch( hash_ref, "lmn", 3, 0 );
-	if( svp == 0 ) svp = hv_fetch( hash_ref, "long_month_names", 17, 0 );
-	if( svp != 0 && SvTYPE( SvRV( *svp ) ) == SVt_PVAV ) {
-		av = (AV*) SvRV( *svp );
-		for( i = 0; i < 12; i ++ )
-			if( ( svp = av_fetch( av, i, 0 ) ) != 0 )
-				strncpy(
-					loc->long_month_names[i],
-					SvPVx( *svp, vlen ),
-					sizeof( loc->long_month_names[i] )
-				);
+	loc->name[0] = '\0';
+	hv_iterinit( hash_ref );
+	while( (sv = hv_iternextsv( hash_ref, &key, &rlen )) != NULL ) {
+		switch( toupper( *key ) ) {
+		case 'A':
+			if( my_stricmp( key, "AMU" ) == 0 ||
+				my_stricmp( key, "AM_UPPER" ) == 0
+			) {
+				strncpy( loc->time_am_upper,
+					SvPV_nolen( sv ), sizeof( loc->time_am_upper ) );
+			}
+			else if( my_stricmp( key, "AML" ) == 0 ||
+				my_stricmp( key, "AM_LOWER" ) == 0
+			) {
+				strncpy( loc->time_am_lower,
+					SvPV_nolen( sv ), sizeof( loc->time_am_lower ) );
+			}
+			else if( my_stricmp( key, "APF" ) == 0 ||
+				my_stricmp( key, "AMPM_FORMAT" ) == 0
+			) {
+				strncpy( loc->ampm_format,
+					SvPV_nolen( sv ), sizeof( loc->ampm_format ) );
+			}
+			else
+				goto _unknown;
+			break;
+		case 'C':
+			if( my_stricmp( key, "CS" ) == 0 ||
+				my_stricmp( key, "CURRENCY_SYMBOL" ) == 0
+			) {
+				strncpy( loc->currency_symbol,
+					SvPV_nolen( sv ), sizeof( loc->currency_symbol ) );
+			}
+			else if( my_stricmp( key, "CSA" ) == 0 ||
+				my_stricmp( key, "CURR_SYMB_ALIGN" ) == 0
+			) {
+				loc->curr_symb_align = (SvPV_nolen( sv ))[0];
+			}
+			else if( my_stricmp( key, "CSS" ) == 0 ||
+				my_stricmp( key, "CURR_SYMB_SPACE" ) == 0
+			) {
+				loc->curr_symb_align = (char) SvIV( sv );
+			}
+			else
+				goto _unknown;
+			break;
+		case 'D':
+			if( my_stricmp( key, "DP" ) == 0 ||
+				my_stricmp( key, "DECIMAL_POINT" ) == 0
+			) {
+				loc->decimal_point = (SvPV_nolen( sv ))[0];
+			}
+			else if( my_stricmp( key, "DF" ) == 0 ||
+				my_stricmp( key, "DATE_FORMAT" ) == 0
+			) {
+				strncpy( loc->date_format,
+					SvPV_nolen( sv ), sizeof( loc->date_format ) );
+			}
+			else if( my_stricmp( key, "DTF" ) == 0 ||
+				my_stricmp( key, "DATETIME_FORMAT" ) == 0
+			) {
+				strncpy( loc->datetime_format,
+					SvPV_nolen( sv ), sizeof( loc->datetime_format ) );
+			}
+			else
+				goto _unknown;
+			break;
+		case 'F':
+			if( my_stricmp( key, "FD" ) == 0 ||
+				my_stricmp( key, "FRAC_DIGITS" ) == 0
+			) {
+				loc->frac_digits = (char) SvIV( sv );
+			}
+			else
+				goto _unknown;
+			break;
+		case 'G':
+			if( my_stricmp( key, "GRP" ) == 0 ||
+				my_stricmp( key, "GROUPING" ) == 0
+			) {
+				if( SvROK(sv) && (sv = SvRV(sv)) &&
+					SvTYPE(sv) == SVt_PVAV
+				) {
+					for( i = 0; i < 3; i++ ) {
+						if( (psv = av_fetch( (AV*) sv, i, 0 )) == NULL )
+							break;
+						loc->grouping[i] = (char) SvIV( *psv );
+					}
+					loc->grouping[i] = -2;
+				}
+				else {
+					loc->grouping[0] = (char) SvIV( sv );
+					loc->grouping[1] = -2;
+				}
+			}
+			else
+				goto _unknown;
+			break;
+		case 'I':
+			if( my_stricmp( key, "IFD" ) == 0 ||
+				my_stricmp( key, "INT_FRAC_DIGITS" ) == 0
+			) {
+				loc->int_frac_digits = (char) SvIV( sv );
+			}
+			else if( my_stricmp( key, "ICS" ) == 0 ||
+				my_stricmp( key, "INT_CURR_SYMBOL" ) == 0
+			) {
+				strncpy( loc->int_curr_symbol,
+					SvPV_nolen( sv ), sizeof( loc->int_curr_symbol ) );
+			}
+			else
+				goto _unknown;
+			break;
+		case 'L':
+			if( my_stricmp( key, "LDN" ) == 0 ||
+				my_stricmp( key, "LONG_DAY_NAMES" ) == 0
+			) {
+				if( SvROK(sv) && (sv = SvRV(sv)) &&
+					SvTYPE(sv) == SVt_PVAV
+				) {
+					av = (AV*) sv;
+					for( i = 0; i < 7; i ++ ) {
+						if( (psv = av_fetch( av, i, 0 )) == NULL )
+							continue;
+						strncpy(
+							loc->long_day_names[i],
+							SvPV_nolen( *psv ),
+							sizeof( loc->long_day_names[i] )
+						);
+					}
+				}
+				else {
+					warn( "Parameter 'long_day_names'"
+						" must be a reference to an array" );
+				}
+			}
+			else if( my_stricmp( key, "LMN" ) == 0 ||
+				my_stricmp( key, "LONG_MONTH_NAMES" ) == 0
+			) {
+				if( SvROK(sv) && (sv = SvRV(sv)) &&
+					SvTYPE(sv) == SVt_PVAV
+				) {
+					av = (AV*) sv;
+					for( i = 0; i < 12; i ++ ) {
+						if( (psv = av_fetch( av, i, 0 )) == NULL )
+							continue;
+						strncpy(
+							loc->long_month_names[i],
+							SvPV_nolen( *psv ),
+							sizeof( loc->long_month_names[i] )
+						);
+					}
+				}
+				else {
+					warn( "Parameter 'long_month_names'"
+						" must be a reference to an array" );
+				}
+			}
+			else
+				goto _unknown;
+			break;
+		case 'N':
+			if( my_stricmp( key, "NS" ) == 0 ||
+				my_stricmp( key, "NEGATIVE_SIGN" ) == 0
+			) {
+				loc->negative_sign = (SvPV_nolen( sv ))[0];
+			}
+			else
+				goto _unknown;
+			break;
+		case 'P':
+			if( my_stricmp( key, "PS" ) == 0 ||
+				my_stricmp( key, "POSITIVE_SIGN" ) == 0
+			) {
+				loc->positive_sign = (SvPV_nolen( sv ))[0];
+			}
+			else if( my_stricmp( key, "PMU" ) == 0 ||
+				my_stricmp( key, "PM_UPPER" ) == 0
+			) {
+				strncpy( loc->time_pm_upper,
+					SvPV_nolen( sv ), sizeof( loc->time_pm_upper ) );
+			}
+			else if( my_stricmp( key, "PML" ) == 0 ||
+				my_stricmp( key, "PM_LOWER" ) == 0
+			) {
+				strncpy( loc->time_pm_lower,
+					SvPV_nolen( sv ), sizeof( loc->time_pm_lower ) );
+			}
+			else
+				goto _unknown;
+			break;
+		case 'S':
+			if( my_stricmp( key, "SDN" ) == 0 ||
+				my_stricmp( key, "SHORT_DAY_NAMES" ) == 0
+			) {
+				if( SvROK(sv) && (sv = SvRV(sv)) &&
+					SvTYPE(sv) == SVt_PVAV
+				) {
+					av = (AV*) sv;
+					for( i = 0; i < 7; i ++ ) {
+						if( (psv = av_fetch( av, i, 0 )) == NULL )
+							continue;
+						strncpy(
+							loc->short_day_names[i],
+							SvPV_nolen( *psv ),
+							sizeof( loc->short_day_names[i] )
+						);
+					}
+				}
+				else {
+					warn( "Parameter 'short_day_names'"
+						" must be a reference to an array" );
+				}
+			}
+			else if( my_stricmp( key, "SDN" ) == 0 ||
+				my_stricmp( key, "SHORT_MONTH_NAMES" ) == 0
+			) {
+				if( SvROK(sv) && (sv = SvRV(sv)) &&
+					SvTYPE(sv) == SVt_PVAV
+				) {
+					av = (AV*) sv;
+					for( i = 0; i < 12; i ++ ) {
+						if( (psv = av_fetch( av, i, 0 )) == NULL )
+							continue;
+						strncpy(
+							loc->short_month_names[i],
+							SvPV_nolen( *psv ),
+							sizeof( loc->short_month_names[i] )
+						);
+					}
+				}
+				else {
+					warn( "Parameter 'short_month_names'"
+						" must be a reference to an array" );
+				}
+			}
+			else
+				goto _unknown;
+			break;
+		case 'T':
+			if( my_stricmp( key, "TS" ) == 0 ||
+				my_stricmp( key, "THOUSANDS_SEP" ) == 0
+			) {
+				loc->thousands_sep = (SvPV_nolen( sv ))[0];
+			}
+			else if( my_stricmp( key, "TF" ) == 0 ||
+				my_stricmp( key, "TIME_FORMAT" ) == 0
+			) {
+				strncpy( loc->time_format,
+					SvPV_nolen( sv ), sizeof( loc->time_format ) );
+			}
+			else
+				goto _unknown;
+			break;
+		default:
+_unknown:
+			warn( "Unknown locale setting '%s'", key );
+			break;
+		}
 	}
 
 
@@ -388,7 +549,7 @@ PREINIT:
 CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
 	if(
-		! tv->timezone.id[0]
+		!tv->timezone.id[0]
 		|| strcmp( tv->timezone.id, tz ) != 0
 	) {
 		Zero( &tv->timezone, 1, my_vtimezone_t );
@@ -420,33 +581,6 @@ PPCODE:
 	else
 		timer = (time_t) SvUV( ST(1) );
 	tim = apply_timezone( tv, &timer );
-	EXTEND( SP, 9 );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_sec ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_min ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_hour ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_mday ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_mon ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_year ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_wday ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_yday ) ) );
-	XPUSHs( sv_2mortal( newSVuv( tim->tm_isdst ) ) );
-
-
-#/*****************************************************************************
-# * gmtime( ... )
-# *****************************************************************************/
-
-void
-gmtime( ... )
-PREINIT:
-	time_t timer;
-	struct tm *tim;
-PPCODE:
-	if( items < 1 )
-		timer = time( 0 );
-	else
-		timer = (time_t) SvUV( ST(0) );
-	tim = gmtime( &timer );
 	EXTEND( SP, 9 );
 	XPUSHs( sv_2mortal( newSVuv( tim->tm_sec ) ) );
 	XPUSHs( sv_2mortal( newSVuv( tim->tm_min ) ) );
@@ -539,17 +673,8 @@ PREINIT:
 	my_thread_var_t *tv;
 CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
-	if( tv )
+	if( tv ) {
+		MY_CXT_LOCK;
 		remove_thread_var( &MY_CXT, tv );
-
-
-#/*****************************************************************************
-# * _cleanup()
-# *****************************************************************************/
-
-void
-_cleanup()
-PREINIT:
-	dMY_CXT;
-CODE:
-	cleanup_my_utils( &MY_CXT );
+		MY_CXT_UNLOCK;
+	}

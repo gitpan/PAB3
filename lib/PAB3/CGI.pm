@@ -103,6 +103,11 @@ sub _import {
 		return;
 	}
 	# export symbols
+	foreach( @_ ) {
+		if( $_ eq ':default' ) {
+			*{$callpkg . '::' . $_} = \%{$pkg . '::' . $_} foreach @EXPORT_SUB;
+		}
+	}
 	*{$callpkg . '::' . $_} = \%{$pkg . '::' . $_} foreach @EXPORT_VAR;
 }
 

@@ -2,7 +2,7 @@
 +0053300 +0001300 Africa/Accra
 +0090200 +0384200 Africa/Addis_Ababa
 +0364700 +0030300 Africa/Algiers
-+0152000 +0385300 Africa/Asmera
++0152000 +0385300 Africa/Asmara
 +0123900 -0080000 Africa/Bamako
 +0042200 +0183500 Africa/Bangui
 +0132800 -0163900 Africa/Banjul
@@ -64,7 +64,7 @@
 -0313200 -0683100 America/Argentina/San_Juan
 -0264900 -0651300 America/Argentina/Tucuman
 -0544800 -0681800 America/Argentina/Ushuaia
-+0123000 -0685800 America/Aruba
++0123000 -0695800 America/Aruba
 -0251600 -0574000 America/Asuncion
 +0484531 -0913718 America/Atikokan
 -0125900 -0383100 America/Bahia
@@ -75,7 +75,7 @@
 +0024900 -0604000 America/Boa_Vista
 +0043600 -0740500 America/Bogota
 +0433649 -1161209 America/Boise
-+0690300 -1050500 America/Cambridge_Bay
++0690650 -1050310 America/Cambridge_Bay
 -0202700 -0543700 America/Campo_Grande
 +0210500 -0864600 America/Cancun
 +0103000 -0665600 America/Caracas
@@ -112,8 +112,10 @@
 +0411745 -0863730 America/Indiana/Knox
 +0382232 -0862041 America/Indiana/Marengo
 +0382931 -0871643 America/Indiana/Petersburg
++0375711 -0864541 America/Indiana/Tell_City
 +0384452 -0850402 America/Indiana/Vevay
 +0384038 -0873143 America/Indiana/Vincennes
++0410305 -0863611 America/Indiana/Winamac
 +0682059 -1334300 America/Inuvik
 +0634400 -0682800 America/Iqaluit
 +0180000 -0764800 America/Jamaica
@@ -126,6 +128,7 @@
 -0094000 -0354300 America/Maceio
 +0120900 -0861700 America/Managua
 -0030800 -0600100 America/Manaus
++0180400 -0630500 America/Marigot
 +0143600 -0610500 America/Martinique
 +0231300 -1062500 America/Mazatlan
 +0450628 -0873651 America/Menominee
@@ -156,12 +159,14 @@
 +0624900 -0920459 America/Rankin_Inlet
 -0080300 -0345400 America/Recife
 +0502400 -1043900 America/Regina
++0744144 -0944945 America/Resolute
 -0095800 -0674800 America/Rio_Branco
 -0332700 -0704000 America/Santiago
 +0182800 -0695400 America/Santo_Domingo
 -0233200 -0463700 America/Sao_Paulo
 +0702900 -0215800 America/Scoresbysund
 +0364708 -1084111 America/Shiprock
++0175300 -0625100 America/St_Barthelemy
 +0473400 -0524300 America/St_Johns
 +0171800 -0624300 America/St_Kitts
 +0140100 -0610000 America/St_Lucia
@@ -270,7 +275,7 @@
 +0321700 -0644600 Atlantic/Bermuda
 +0280600 -0152400 Atlantic/Canary
 +0145500 -0233100 Atlantic/Cape_Verde
-+0620100 -0064600 Atlantic/Faeroe
++0620100 -0064600 Atlantic/Faroe
 +0705900 -0080500 Atlantic/Jan_Mayen
 +0323800 -0165400 Atlantic/Madeira
 +0640900 -0215100 Atlantic/Reykjavik
@@ -282,6 +287,7 @@
 -0315700 +1412700 Australia/Broken_Hill
 -0395600 +1435200 Australia/Currie
 -0122800 +1305000 Australia/Darwin
+-0314300 +1285200 Australia/Eucla
 -0425300 +1471900 Australia/Hobart
 -0201600 +1490000 Australia/Lindeman
 -0313300 +1590500 Australia/Lord_Howe
@@ -310,7 +316,7 @@
 +0502600 +0303100 Europe/Kiev
 +0384300 -0090800 Europe/Lisbon
 +0460300 +0143100 Europe/Ljubljana
-+0512830 +0001845 Europe/London
++0513030 +0000731 Europe/London
 +0493600 +0060900 Europe/Luxembourg
 +0402400 -0034100 Europe/Madrid
 +0355400 +0143100 Europe/Malta
@@ -358,7 +364,7 @@
 -0135000 -1714400 Pacific/Apia
 -0365200 +1744600 Pacific/Auckland
 -0435700 -1763300 Pacific/Chatham
--0271000 -1092700 Pacific/Easter
+-0270900 -1092600 Pacific/Easter
 -0174000 +1682500 Pacific/Efate
 -0030800 -1710500 Pacific/Enderbury
 -0092200 -1711400 Pacific/Fakaofo
@@ -369,7 +375,7 @@
 -0093200 +1601200 Pacific/Guadalcanal
 +0132800 +1444500 Pacific/Guam
 +0211825 -1575130 Pacific/Honolulu
-+0170000 -1683000 Pacific/Johnston
++0164500 -1693100 Pacific/Johnston
 +0015200 -1572000 Pacific/Kiritimati
 +0051900 +1625900 Pacific/Kosrae
 +0090500 +1672000 Pacific/Kwajalein

@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Atlantic/Cape_Verde
+TZID:/navalla.org/20071203_1/Atlantic/Cape_Verde
 X-LIC-LOCATION:Atlantic/Cape_Verde
 BEGIN:STANDARD
 TZOFFSETFROM:-0100

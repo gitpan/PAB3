@@ -1,5 +1,20 @@
 Revision history for Perl extension PAB3.
 
+version 3.2
+    - changed version style
+    - changed format of locale information
+    - updated zoneinfo database
+    - updated locale information database
+    - fixed bug 50324
+
+version 3.1.6
+    - added static linking to crt on windows
+    - fixed bug in session handler module
+    - small improvements in utils class
+    - fixed more type conversations
+    - fixed detection bug on windows
+    - fixed timezone calculation
+
 version 3.1.5
     - fixed type conversations on 64bit systems
 

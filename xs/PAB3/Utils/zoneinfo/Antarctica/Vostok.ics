@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Antarctica/Vostok
+TZID:/navalla.org/20071203_1/Antarctica/Vostok
 X-LIC-LOCATION:Antarctica/Vostok
 BEGIN:STANDARD
 TZOFFSETFROM:+0600

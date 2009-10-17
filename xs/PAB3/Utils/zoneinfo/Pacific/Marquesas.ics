@@ -1,8 +1,8 @@
 BEGIN:VCALENDAR
-PRODID:-//Perl//PAB
+PRODID:-//Navalla//PerlCGI//EN
 VERSION:2.0
 BEGIN:VTIMEZONE
-TZID:/pab.vtz/20061208_1/Pacific/Marquesas
+TZID:/navalla.org/20071203_1/Pacific/Marquesas
 X-LIC-LOCATION:Pacific/Marquesas
 BEGIN:STANDARD
 TZOFFSETFROM:-0930
