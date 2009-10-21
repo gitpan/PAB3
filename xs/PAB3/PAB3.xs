@@ -475,7 +475,7 @@ exit:
 void
 set_error( this, msg )
 	SV *this;
-	const char *msg;
+	char *msg;
 PREINIT:
 	dMY_CXT;
 	my_thread_var_t *tv;

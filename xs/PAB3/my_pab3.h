@@ -151,6 +151,7 @@ typedef struct st_my_cxt {
 	my_thread_var_t				*last_thread;
 } my_cxt_t;
 
+
 START_MY_CXT
 
 static const my_thread_var_t THREADVAR_DEFAULT = {

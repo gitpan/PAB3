@@ -113,9 +113,8 @@ sub start {
 		&PAB3::CGI::cleanup_register( \&cleanup );
 	}
 	%_SESSION = ();
-	if( $Config{'gc_probality'} / $Config{'gc_divisor'}
-		>= rand() * $Config{'gc_divisor'} + 1
-	) {
+	my $prob = $Config{'gc_probality'};
+	if( $prob > 0 && rand() * $Config{'gc_divisor'} < $prob ) {
 		&gc();
 	}
 	if( $Config{'id'} ) {

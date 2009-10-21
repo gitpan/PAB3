@@ -20,9 +20,6 @@ $Verbose = 0;
     H => ['my_utils.h'],
 );
 
-if( $Config{'usethreads'} ) {
-	$MAKEOPTS{'DEFINE'} .= ' -DUSE_THREADS';
-}
 if( $^O eq 'MSWin32' ) {
 	$MAKEOPTS{'DEFINE'} .= ' -D_CRT_SECURE_NO_DEPRECATE -D_CRT_SECURE_NO_WARNINGS';
 	# help makemaker removing not existing libs, eg. bufferoverflowU.lib

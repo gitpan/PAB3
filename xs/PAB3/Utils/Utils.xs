@@ -33,8 +33,10 @@ PREINIT:
 	dMY_CXT;
 CODE:
 	(void) items; /* avoid compiler warning */
+#ifdef USE_ITHREADS
 	if( MY_CXT.perl != aTHX )
 		XSRETURN_EMPTY;
+#endif
 	cleanup_my_utils( &MY_CXT );
 #ifdef USE_ITHREADS
 	MUTEX_DESTROY( &MY_CXT.thread_lock );
@@ -186,7 +188,7 @@ OUTPUT:
 # * _set_locale( tid, ... )
 # *****************************************************************************/
 
-const char *
+char *
 _set_locale( tid, ... )
 	UV tid;
 PREINIT:
@@ -197,9 +199,9 @@ PREINIT:
 CODE:
 	find_or_create_tv( &MY_CXT, tv, tid );
 	for( i = 1; i < items; i ++ ) {
-		str = (const char *) SvPV_nolen( ST(i) );
+		str = SvPV_nolen( ST(i) );
 		if( (str = get_locale_format_settings( &MY_CXT, str, &tv->locale )) ) {
-			RETVAL = str;
+			RETVAL = (char *) str;
 			goto exit;
 		}
 	}
@@ -542,7 +544,7 @@ CODE:
 int
 _set_timezone( tid, tz )
 	UV tid;
-	const char *tz;
+	char *tz;
 PREINIT:
 	dMY_CXT;
 	my_thread_var_t *tv;
@@ -648,7 +650,7 @@ exit:
 void
 _strfmon( tid, format, number )
 	UV tid;
-	const char *format;
+	char *format;
 	double number;
 PREINIT:
 	dMY_CXT;

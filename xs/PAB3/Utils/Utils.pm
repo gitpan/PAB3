@@ -250,9 +250,10 @@ long version:
   'grp' or 'grouping'              => numeric grouping, (i.e. [3, 2])
   'cs'  or 'currency_symbol'       => local currency symbol (i.e. $)
   'ics' or 'int_curr_symbol'       => international currency symbol (i.e. USD)
-  'csa' or 'curr_symb_align'       => local currency symbol alignment
-                                      'l' for left, 'r' for right
-  'css' or 'curr_symb_space'       => currency symbol space, true or false
+  'csa' or 'curr_symb_align'       => currency symbol alignment:
+                                      'l' = left side, 'r' = right side
+  'css' or 'curr_symb_space'       => space between currency symbol and value:
+                                      true or false
   'fd'  or 'frac_digits'           => local fractional digits
   'ifd' or 'int_frac_digits'       => international fractional digits
   'ns'  or 'negative_sign'         => sign for negative values
@@ -292,10 +293,10 @@ B<Example>
       'pml' => 'pm',
       'amu' => 'AM',
       'pmu' => 'PM',
-	  'apf' => '%I:%M:%S %p',
+      'apf' => '%I:%M:%S %p',
       'df'  => '%m/%d/%Y',
       'tf'  => '%H:%M:%S',
-	  'dtf' => '%a %d %b %Y %r %Z',
+      'dtf' => '%a %d %b %Y %r %Z',
       'sdn' => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       'ldn' => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday',
                 'Friday', 'Saturday'],
@@ -479,7 +480,7 @@ The following conversion specifiers are recognized in the format string:
 I<$timestamp>
 
 The optional timestamp parameter is an integer Unix timestamp that defaults to
-the current local time if a timestamp is not given. In other words, it defaults
+the current time if a timestamp is not given. In other words, it defaults
 to the value of time().
 
 I<$gmt>

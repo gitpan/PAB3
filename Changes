@@ -1,5 +1,9 @@
 Revision history for Perl extension PAB3.
 
+version 3.201
+    - fixed gc activation in session module
+    - fixed broken distribution for unthreaded perl
+
 version 3.2
     - changed version style
     - changed format of locale information

@@ -22,7 +22,7 @@ use constant {
 };
 
 BEGIN {
-	$VERSION = '3.2';
+	$VERSION = '3.201';
 	require XSLoader;
 	XSLoader::load( __PACKAGE__, $VERSION );
 	if( ! $PAB3::CGI::VERSION ) {

@@ -1471,7 +1471,7 @@ char *_int_number_format( double value, char *str, int maxlen, int fd, char dp,
 }
 
 DWORD get_current_thread_id() {
-#ifdef USE_THREADS
+#ifdef USE_ITHREADS
 #ifdef _WIN32
 	return GetCurrentThreadId();
 #else

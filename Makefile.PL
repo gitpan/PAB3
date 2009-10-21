@@ -1,3 +1,4 @@
+package PAB3::Install;
 use 5.008;
 use ExtUtils::MakeMaker;
 
@@ -14,37 +15,14 @@ EOF1
 }
 
 $PAB = 1;
-%PAB_OPT = (
-	'with_mysql' => '_auto_',
-	'with_pgsql' => '_auto_',
-	'with_sqlite3' => '_auto_',
-);
 
 @argv = ();
 foreach( @ARGV ) {
 	if( /--help/ ) {
 		print_usage();
 	}
-	if( /--with-mysql=*(.*)/ ) {
-		$PAB_OPT{'with_mysql'} = $1 ? $1 : '_search_';
-	}
-	elsif( /--with-pgsql=*(.*)/ ) {
-		$PAB_OPT{'with_pgsql'} = $1 ? $1 : '_search_';
-	}
-	elsif( /--with-sqlite3=*(.*)/ ) {
-		$PAB_OPT{'with_sqlite3'} = $1 ? $1 : '_search_';
-	}
-	elsif( /--enable-sqlite3-metadata/ ) {
-		$PAB_OPT{'sqlite3_enable_metadata'} = 1;
-	}
-	elsif( /--disable-mysql/ ) {
-		$PAB_OPT{'with_mysql'} = 0;
-	}
-	elsif( /--disable-pgsql/ ) {
-		$PAB_OPT{'with_pgsql'} = 0;
-	}
-	elsif( /--disable-sqlite3/ ) {
-		$PAB_OPT{'with_sqlite3'} = 0;
+	if( /--verbose/ ) {
+		$Verbose = 1;
 	}
 	else {
 		push @argv, $_;
@@ -77,15 +55,7 @@ sub print_usage {
 Usage: perl $0 [options]
 Options:
     --help               print this message
-
-    --with-mysql[=DIR]   Include MySQL support. DIR is the MySQL base directory or the path to mysql_config
-    --with-pgsql[=DIR]   Include PostgreSQL support. DIR is the PostgreSQL base install directory or the path to pg_config
-    --with-sqlite3[=DIR]  Include SQLite3 support. DIR is the SQLite3 base install directory
-    --enable-sqlite3-metadata   Enable SQLite3 column metadata. SQLite3 must be compiled with SQLITE_ENABLE_COLUMN_METADATA preprocessor symbol
-
-    --disable-mysql      Disable MySQL support. Enabled by default
-    --disable-pgsql      Disable PostgreSQL support. Enabled by default
-    --disable-sqlite3    Disable SQLite3 support. Enabled by default
+    --verbose            enable MakeMaker's verbosity
 USAGE
-	exit 256;
+	exit;
 }
